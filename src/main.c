@@ -1,6 +1,7 @@
 #include "raylib.h"
 #include <stdbool.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 450
@@ -35,10 +36,10 @@ void FisherYatesShuffle(void) {
     idx[j] = temp;
   }
 
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < BOMBS; i++) {
     int row = idx[i] / COLUMNS;
     int col = idx[i] % COLUMNS;
-    grid[row * COLUMNS + col]->hasMines = true;
+    grid[row][col].hasMines = true;
   }
 
   for (int r = 0; r < ROWS; r++) {
@@ -50,9 +51,9 @@ void FisherYatesShuffle(void) {
             continue;
           int nr = r + dr, nc = c + dc;
           if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLUMNS)
-            count += grid[nr * COLUMNS + nc]->hasMines;
+            count += grid[nr][nc].hasMines;
         }
-      grid[r * COLUMNS + c]->neighbourMines = count;
+      grid[r][c].neighbourMines = count;
     }
   }
 }
@@ -82,7 +83,7 @@ void DrawMinesweeperGrid(void) {
       DrawRectangleLines(x, y, CELL_SIZE, CELL_SIZE, DARKGRAY);
 
       if (cell.revealed && !cell.hasMines && cell.neighbourMines > 0) {
-        DrawText(TextFormat("%d, cell.neighbourMines"), x + CELL_SIZE / 3,
+        DrawText(TextFormat("%d", cell.neighbourMines), x + CELL_SIZE / 3,
                  y + CELL_SIZE / 4, 20, DARKBLUE);
       }
 
@@ -154,8 +155,12 @@ void HandleInput(void) {
 }
 
 int main(void) {
+  srand(time(NULL));
   InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);
   SetTargetFPS(TARGET_FPS);
+
+  InitGrid();
+  FisherYatesShuffle();
 
   while (!WindowShouldClose()) {
     HandleInput();
