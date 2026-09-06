@@ -19,6 +19,14 @@ typedef struct {
   int neighbourMines;
 } Cell;
 
+#define BTN_WIDTH 140
+#define BTN_HEIGHT 40
+
+Rectangle newGameButton = {.x = 10,
+                           .y = ROWS * CELL_SIZE + 10,
+                           .width = BTN_WIDTH,
+                           .height = BTN_HEIGHT};
+
 Cell grid[ROWS][COLUMNS];
 bool gameOver = false;
 bool won = false;
@@ -81,6 +89,19 @@ void RevealAllMines(void) {
   }
 }
 
+void DrawUI(void) {
+  DrawRectangleRec(newGameButton, LIGHTGRAY);
+  DrawRectangleLinesEx(newGameButton, 2, DARKGRAY);
+
+  const char *label = "New Game";
+  int fontSize = 20;
+  int textWidth = MeasureText(label, fontSize);
+
+  int textX = newGameButton.x + (newGameButton.width - textWidth) / 2;
+  int textY = newGameButton.y + (newGameButton.height - fontSize) / 2;
+  DrawText(label, textX, textY, fontSize, BLACK);
+}
+
 void DrawMinesweeperGrid(void) {
   for (int i = 0; i < ROWS; i++) {
     for (int j = 0; j < COLUMNS; j++) {
@@ -110,8 +131,10 @@ void DrawMinesweeperGrid(void) {
     }
   }
 
+  DrawUI();
+
   if (won) {
-    DrawText("You Win!", 10, ROWS * COLUMNS + 100, 20, GREEN);
+    DrawText("You Win!", 10, ROWS * COLUMNS * 4.5, 20, GREEN);
   } else if (gameOver) {
     DrawText("Game Over", 10, ROWS * COLUMNS * 4.5, 20, RED);
   }
@@ -149,8 +172,26 @@ void floodFill(int row, int col) {
   }
 }
 
+void NewGame(void) {
+  InitGrid();
+  FisherYatesShuffle();
+  gameOver = false;
+  won = false;
+  revealCount = 0;
+}
+
 void HandleInput(void) {
   Vector2 mouse = GetMousePosition();
+
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+      CheckCollisionPointRec(mouse, newGameButton)) {
+    NewGame();
+    return;
+  }
+
+  if (gameOver)
+    return;
+
   int col = (int)(mouse.x / CELL_SIZE);
   int row = (int)(mouse.y / CELL_SIZE);
 
@@ -175,14 +216,11 @@ int main(void) {
   InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);
   SetTargetFPS(TARGET_FPS);
 
-  InitGrid();
-  FisherYatesShuffle();
+  NewGame();
 
   while (!WindowShouldClose()) {
 
-    if (!gameOver) {
-      HandleInput();
-    }
+    HandleInput();
 
     if (!gameOver && CheckWin()) {
       won = true;
