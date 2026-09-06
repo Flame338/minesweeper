@@ -1,4 +1,6 @@
 #include "raylib.h"
+#include <stdbool.h>
+#include <stdlib.h>
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 450
@@ -8,6 +10,7 @@
 #define ROWS 9
 #define COLUMNS 9
 #define CELL_SIZE 40
+#define BOMBS 10
 
 typedef struct {
   bool revealed;
@@ -17,6 +20,42 @@ typedef struct {
 } Cell;
 
 Cell grid[ROWS][COLUMNS];
+
+void FisherYatesShuffle(void) {
+  int n = ROWS * COLUMNS;
+
+  int *idx = (int *)malloc(n * sizeof(int));
+  for (int i = 0; i < n; i++)
+    idx[i] = i;
+
+  for (int i = 0; i < n; i++) {
+    int j = rand() % (i + 1);
+    int temp = idx[i];
+    idx[i] = idx[j];
+    idx[j] = temp;
+  }
+
+  for (int i = 0; i < n; i++) {
+    int row = idx[i] / COLUMNS;
+    int col = idx[i] % COLUMNS;
+    grid[row * COLUMNS + col]->hasMines = true;
+  }
+
+  for (int r = 0; r < ROWS; r++) {
+    for (int c = 0; c < COLUMNS; c++) {
+      int count = 0;
+      for (int dr = -1; dr <= 1; dr++)
+        for (int dc = -1; dc <= 1; dc++) {
+          if (dr == 0 && dc == 0)
+            continue;
+          int nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLUMNS)
+            count += grid[nr * COLUMNS + nc]->hasMines;
+        }
+      grid[r * COLUMNS + c]->neighbourMines = count;
+    }
+  }
+}
 
 void InitGrid(void) {
   for (int i = 0; i < ROWS; i++) {
@@ -56,16 +95,16 @@ void DrawMinesweeperGrid(void) {
   }
 }
 
-void testText() {
-  const char dummy_text[] = "Raylib is working on WSL";
-  const int font_size = 20;
-  int textWidth = MeasureText(dummy_text, font_size);
-
-  int textStartX = GetScreenWidth() / 2 - (textWidth / 2);
-  int textStartY = GetScreenHeight() / 2 - (font_size / 2);
-
-  DrawText(dummy_text, textStartX, textStartY, font_size, LIGHTGRAY);
-}
+// void testText() {
+//   const char dummy_text[] = "Raylib is working on WSL";
+//   const int font_size = 20;
+//   int textWidth = MeasureText(dummy_text, font_size);
+//
+//   int textStartX = GetScreenWidth() / 2 - (textWidth / 2);
+//   int textStartY = GetScreenHeight() / 2 - (font_size / 2);
+//
+//   DrawText(dummy_text, textStartX, textStartY, font_size, LIGHTGRAY);
+// }
 
 void floodFill(int row, int col) {
   if (row < 0 || row >= ROWS || col < 0 || col >= COLUMNS)
