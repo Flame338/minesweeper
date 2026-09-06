@@ -56,6 +56,43 @@ void DrawMinesweeperGrid(void) {
   }
 }
 
+void testText() {
+  const char dummy_text[] = "Raylib is working on WSL";
+  const int font_size = 20;
+  int textWidth = MeasureText(dummy_text, font_size);
+
+  int textStartX = GetScreenWidth() / 2 - (textWidth / 2);
+  int textStartY = GetScreenHeight() / 2 - (font_size / 2);
+
+  DrawText(dummy_text, textStartX, textStartY, font_size, LIGHTGRAY);
+}
+
+void floodFill(int row, int col) {
+  if (row < 0 || row >= ROWS || col < 0 || col >= COLUMNS)
+    return;
+  if (grid[row][col].revealed)
+    return;
+  if (grid[row][col].flagged)
+    return;
+  if (grid[row][col].hasMines)
+    return;
+
+  grid[row][col].revealed = true;
+
+  // Hit a numbered cell. Stop spreading
+  if (grid[row][col].neighbourMines > 0)
+    return;
+
+  // Still blank -> keep spreading to all 8 neighbous
+  for (int dr = -1; dr <= 1; dr++) {
+    for (int dc = -1; dc <= 1; dc++) {
+      if (dr == 0 && dc == 0)
+        continue;
+      floodFill(row + dr, col + dc);
+    }
+  }
+}
+
 void HandleInput(void) {
   Vector2 mouse = GetMousePosition();
   int col = (int)(mouse.x / CELL_SIZE);
@@ -66,7 +103,7 @@ void HandleInput(void) {
 
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
     if (!grid[row][col].flagged) {
-      grid[row][col].revealed = true;
+      floodFill(row, col);
     }
   }
 
@@ -75,17 +112,6 @@ void HandleInput(void) {
       grid[row][col].flagged = !grid[row][col].flagged;
     }
   }
-}
-
-void testText() {
-  const char dummy_text[] = "Raylib is working on WSL";
-  const int font_size = 20;
-  int textWidth = MeasureText(dummy_text, font_size);
-
-  int textStartX = GetScreenWidth() / 2 - (textWidth / 2);
-  int textStartY = GetScreenHeight() / 2 - (font_size / 2);
-
-  DrawText(dummy_text, textStartX, textStartY, font_size, LIGHTGRAY);
 }
 
 int main(void) {
