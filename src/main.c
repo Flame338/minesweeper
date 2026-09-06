@@ -11,7 +11,6 @@
 #define ROWS 9
 #define COLUMNS 9
 #define CELL_SIZE 40
-#define BOMBS 10
 
 typedef struct {
   bool revealed;
