@@ -17,11 +17,27 @@ typedef struct {
 } Cell;
 
 Cell grid[ROWS][COLUMNS];
+bool gameOver = false;
+bool won = false;
+int BOMBS = 10;
+int revealCount = 0;
+
+bool CheckWin(void) { return revealCount == (ROWS * COLUMNS - BOMBS); }
 
 void InitGrid(void) {
   for (int i = 0; i < ROWS; i++) {
     for (int j = 0; j < COLUMNS; j++) {
       grid[i][j] = (Cell){0};
+    }
+  }
+}
+
+void RevealAllMines(void) {
+  for (int r = 0; r < ROWS; r++) {
+    for (int c = 0l; c < COLUMNS; c++) {
+      if (grid[r][c].hasMines) {
+        grid[r][c].revealed = true;
+      }
     }
   }
 }
@@ -54,17 +70,12 @@ void DrawMinesweeperGrid(void) {
       }
     }
   }
-}
 
-void testText() {
-  const char dummy_text[] = "Raylib is working on WSL";
-  const int font_size = 20;
-  int textWidth = MeasureText(dummy_text, font_size);
-
-  int textStartX = GetScreenWidth() / 2 - (textWidth / 2);
-  int textStartY = GetScreenHeight() / 2 - (font_size / 2);
-
-  DrawText(dummy_text, textStartX, textStartY, font_size, LIGHTGRAY);
+  if (won) {
+    DrawText("You Win!", 10, ROWS * COLUMNS + 100, 20, GREEN);
+  } else if (gameOver) {
+    DrawText("Game Over", 10, ROWS * COLUMNS * 4.5, 20, RED);
+  }
 }
 
 void floodFill(int row, int col) {
@@ -72,12 +83,18 @@ void floodFill(int row, int col) {
     return;
   if (grid[row][col].revealed)
     return;
-  if (grid[row][col].flagged)
+  if (grid[row][col].flagged) {
     return;
-  if (grid[row][col].hasMines)
+  }
+  if (grid[row][col].hasMines) {
+    grid[row][col].revealed = true;
+    RevealAllMines();
+    gameOver = true;
     return;
+  }
 
   grid[row][col].revealed = true;
+  revealCount++;
 
   // Hit a numbered cell. Stop spreading
   if (grid[row][col].neighbourMines > 0)
@@ -119,8 +136,14 @@ int main(void) {
   SetTargetFPS(TARGET_FPS);
 
   while (!WindowShouldClose()) {
-    HandleInput();
 
+    if (!gameOver) {
+      HandleInput();
+    }
+
+    if (!gameOver && CheckWin()) {
+      won = true;
+    }
     BeginDrawing();
     ClearBackground(RAYWHITE);
     DrawMinesweeperGrid();
