@@ -3,14 +3,16 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 450
 #define WINDOW_TITLE "Minesweeper"
 #define TARGET_FPS 120
 
 #define ROWS 9
 #define COLUMNS 9
 #define CELL_SIZE 40
+
+#define PANEL_HEIGHT 90
+#define WINDOW_HEIGHT (COLUMNS * CELL_SIZE)
+#define WINDOW_WIDTH (ROWS * CELL_SIZE + PANEL_HEIGHT)
 
 typedef struct {
   bool revealed;
@@ -19,11 +21,14 @@ typedef struct {
   int neighbourMines;
 } Cell;
 
+Color numberColors[9] = {BLANK,  BLUE,       DARKGREEN, RED, DARKBLUE,
+                         MAROON, DARKPURPLE, BLACK,     GRAY};
+
 #define BTN_WIDTH 140
 #define BTN_HEIGHT 40
 
-Rectangle newGameButton = {.x = 10,
-                           .y = ROWS * CELL_SIZE + 10,
+Rectangle newGameButton = {.x = (WINDOW_WIDTH - BTN_WIDTH) / 2.0f,
+                           .y = ROWS * CELL_SIZE + 15,
                            .width = BTN_WIDTH,
                            .height = BTN_HEIGHT};
 
@@ -90,16 +95,37 @@ void RevealAllMines(void) {
 }
 
 void DrawUI(void) {
-  DrawRectangleRec(newGameButton, LIGHTGRAY);
-  DrawRectangleLinesEx(newGameButton, 2, DARKGRAY);
+  int panelY = ROWS * CELL_SIZE;
 
+  DrawRectangle(0, panelY, WINDOW_WIDTH, PANEL_HEIGHT,
+                (Color){40, 44, 52, 255});
+
+  Vector2 mouse = GetMousePosition();
+  bool hovered = CheckCollisionPointRec(mouse, newGameButton);
+  Color btnColor =
+      hovered ? (Color){90, 200, 250, 255} : (Color){70, 130, 180, 255};
+
+  DrawRectangleRounded(newGameButton, 0.3f, 8, btnColor);
   const char *label = "New Game";
-  int fontSize = 20;
-  int textWidth = MeasureText(label, fontSize);
+  int labelWidth = MeasureText(label, 18);
+  DrawText(label, newGameButton.x + (newGameButton.width - labelWidth) / 2,
+           newGameButton.y + (newGameButton.height - 18) / 2, 18, RAYWHITE);
 
-  int textX = newGameButton.x + (newGameButton.width - textWidth) / 2;
-  int textY = newGameButton.y + (newGameButton.height - fontSize) / 2;
-  DrawText(label, textX, textY, fontSize, BLACK);
+  const char *status = NULL;
+  Color statusColor = RAYWHITE;
+  if (won) {
+    status = "You Win!";
+    statusColor = GREEN;
+  } else if (gameOver) {
+    status = "Game Over!";
+    statusColor = RED;
+  }
+
+  if (status != NULL) {
+    int statusWidth = MeasureText(status, 20);
+    DrawText(status, (WINDOW_WIDTH - statusWidth) / 2,
+             newGameButton.y + newGameButton.height + 12, 20, statusColor);
+  }
 }
 
 void DrawMinesweeperGrid(void) {
@@ -110,17 +136,23 @@ void DrawMinesweeperGrid(void) {
 
       Cell cell = grid[i][j];
 
-      Color fill = LIGHTGRAY;
-      if (cell.revealed)
-        fill = RAYWHITE;
-      if (cell.flagged)
-        fill = YELLOW;
+      Color fill;
+      if (cell.flagged) {
+        fill = GOLD;
+      } else if (cell.revealed) {
+        fill = ((i + j) % 2 == 0) ? RAYWHITE : (Color){235, 235, 235, 255};
+      } else {
+        fill = ((i + j) % 2 == 0) ? RAYWHITE : (Color){190, 190, 190, 255};
+      }
+
       DrawRectangle(x, y, CELL_SIZE, CELL_SIZE, fill);
       DrawRectangleLines(x, y, CELL_SIZE, CELL_SIZE, DARKGRAY);
 
       if (cell.revealed && !cell.hasMines && cell.neighbourMines > 0) {
-        DrawText(TextFormat("%d", cell.neighbourMines), x + CELL_SIZE / 3,
-                 y + CELL_SIZE / 4, 20, DARKBLUE);
+        const char *num = TextFormat("%d", cell.neighbourMines);
+        int textWidth = MeasureText(num, 20);
+        DrawText(num, x + (CELL_SIZE - textWidth) / 2, y + CELL_SIZE / 4, 20,
+                 numberColors[cell.neighbourMines]);
       }
 
       // If revealed and is a mine, draw a simple make
@@ -132,12 +164,6 @@ void DrawMinesweeperGrid(void) {
   }
 
   DrawUI();
-
-  if (won) {
-    DrawText("You Win!", 10, ROWS * COLUMNS * 4.5, 20, GREEN);
-  } else if (gameOver) {
-    DrawText("Game Over", 10, ROWS * COLUMNS * 4.5, 20, RED);
-  }
 }
 
 void floodFill(int row, int col) {
