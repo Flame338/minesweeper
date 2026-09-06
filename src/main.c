@@ -92,7 +92,14 @@ void RevealAllMines(void) {
 void DrawUI(void) {
   DrawRectangleRec(newGameButton, LIGHTGRAY);
   DrawRectangleLinesEx(newGameButton, 2, DARKGRAY);
-  DrawText("New Game", 10, ROWS * CELL_SIZE + 60, 20, GREEN);
+
+  const char *label = "New Game";
+  int fontSize = 20;
+  int textWidth = MeasureText(label, fontSize);
+
+  int textX = newGameButton.x + (newGameButton.width - textWidth) / 2;
+  int textY = newGameButton.y + (newGameButton.height - fontSize) / 2;
+  DrawText(label, textX, textY, fontSize, BLACK);
 }
 
 void DrawMinesweeperGrid(void) {
@@ -182,6 +189,9 @@ void HandleInput(void) {
     return;
   }
 
+  if (gameOver)
+    return;
+
   int col = (int)(mouse.x / CELL_SIZE);
   int row = (int)(mouse.y / CELL_SIZE);
 
@@ -210,9 +220,7 @@ int main(void) {
 
   while (!WindowShouldClose()) {
 
-    if (!gameOver) {
-      HandleInput();
-    }
+    HandleInput();
 
     if (!gameOver && CheckWin()) {
       won = true;
