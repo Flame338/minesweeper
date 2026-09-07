@@ -1,9 +1,5 @@
 /*
  * pcg32 tests.
- *
- * Note: this TU includes board.h (via tests.h) AND pcg32.h directly, so it
- * only compiles if pcg32.h's include guard is correct. Before the
- * `#ifndef DEBUG -> #ifndef PCG32_H` fix, this file failed to compile.
  */
 #include "tests.h"
 #include "../include/pcg32.h"
