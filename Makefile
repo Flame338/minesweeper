@@ -25,10 +25,17 @@ INC_DIR   := include
 BUILD_DIR := build
 BIN_DIR   := bin
 RAYLIB_DIR := raylib
+TEST_DIR  := tests
+TOOLS_DIR := tools
 
 # Output binary name (.exe required on Windows; gcc appends it if omitted, but
 # the `run` target needs the real name to launch the built exe)
 TARGET := $(BIN_DIR)/minesweeper.exe
+
+# Headless runnables that reuse the raylib-free game logic (board/pcg32/replay)
+CORE_SRCS := $(SRC_DIR)/board.c $(SRC_DIR)/pcg32.c $(SRC_DIR)/replay.c
+TOOL_EXE  := $(BIN_DIR)/ms_tool.exe
+TEST_EXE  := $(BUILD_DIR)/test_minesweeper.exe
 
 # Find all source files automatically
 SOURCES := $(wildcard $(SRC_DIR)/*.$(SRC_EXT))
@@ -67,6 +74,25 @@ $(BIN_DIR):
 run: all
 	./$(TARGET)
 
+# Build the headless debug tool (no raylib) into bin/ms_tool.exe
+tools: $(TOOL_EXE)
+
+$(TOOL_EXE): $(TOOLS_DIR)/ms_tool.c $(CORE_SRCS) | $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $(TOOLS_DIR)/ms_tool.c $(CORE_SRCS) -lm
+	@echo "Built $(TOOL_EXE)"
+
+# Compile and run the test suite
+test: $(TEST_EXE)
+	./$(TEST_EXE)
+
+$(TEST_EXE): $(TEST_DIR)/test_runner.c $(TEST_DIR)/test_pcg32.c \
+             $(TEST_DIR)/test_board.c $(TEST_DIR)/test_replay.c \
+             $(TEST_DIR)/test_roundtrip.c $(CORE_SRCS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(TEST_DIR)/test_runner.c $(TEST_DIR)/test_pcg32.c \
+	    $(TEST_DIR)/test_board.c $(TEST_DIR)/test_replay.c \
+	    $(TEST_DIR)/test_roundtrip.c $(CORE_SRCS) -lm
+	@echo "Built $(TEST_EXE)"
+
 # Remove build artifacts
 clean:
 	rm -rf $(BUILD_DIR) $(BIN_DIR)
@@ -74,4 +100,4 @@ clean:
 # Rebuild everything from scratch
 rebuild: clean all
 
-.PHONY: all run clean rebuild
+.PHONY: all run tools test clean rebuild

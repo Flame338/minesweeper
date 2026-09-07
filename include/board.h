@@ -42,6 +42,11 @@ bool CheckWin(void);
 // rolls a fresh seed.
 void NewGame(void);
 
+// Like NewGame(), but with an explicit seed. Deterministic boards — the tests
+// and the headless tool use this; start replay with NewGameWithSeed if you
+// want the same layout twice.
+void NewGameWithSeed(u64 seed);
+
 void PerformReveal(int row, int col);
 void PerformToggleFlag(int row, int col);
 

@@ -18,3 +18,20 @@ Developed against **raylib 6.0** on **Windows (MinGW-w64 / w64devkit)**.
 
 The Makefile links the Windows system libraries raylib's backend needs
 (`-lopengl32 -lgdi32 -lwinmm -luser32 -lshell32`).
+
+## Testing & debug tool
+
+The game rules live in `src/board.c`, `src/pcg32.c`, and `src/replay.c`, which
+are raylib-free so they can be tested and scripted headlessly.
+
+- `make test` — builds and runs the test suite (`tests/`, no framework; a tiny
+  `CHECK` harness) and exits non-zero if anything fails.
+- `make tools` — builds `bin/ms_tool.exe`, a headless REPL driver for the game
+  logic. Pipe commands (`new --seed N`, `reveal R C`, `flag R C`, `dump
+  --inspect`, `state`, `save PATH`, `load PATH`, `step DT`, `replay PATH`) to
+  script and inspect a game without launching the window. The test suite and the
+  tool share the same seed-based determinism, so a layout from `ms_tool` can be
+  reproduced exactly in a test.
+
+Replay files (`replay.msr`) are runtime artifacts and are git-ignored.
+

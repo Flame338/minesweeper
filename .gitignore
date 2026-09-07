@@ -48,4 +48,5 @@ raylib/
 # IDE/Editor files
 .vscode/
 .idea/
-*.sln   
+*.sln
+docs/   

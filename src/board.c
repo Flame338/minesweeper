@@ -146,7 +146,17 @@ void PerformToggleFlag(int row, int col) {
   }
 }
 
+// Resets the board and replay log, then rolls a fresh random seed.
 void NewGame(void) {
+  // Combining wall-clock & CPU clock so that two games started at the same
+  // second still gets different seeds
+  NewGameWithSeed(((u64)time(NULL) << 32) ^ (u64)clock());
+}
+
+// Same as NewGame() but with an explicit seed. Exposes the seed as a seam so
+// tests and the headless tool can build a fully deterministic board (and thus
+// a fully deterministic replay).
+void NewGameWithSeed(u64 seed) {
   InitGrid();
   gameOver = false;
   won = false;
@@ -160,8 +170,6 @@ void NewGame(void) {
   ReplayLogFree(&currentLog);
   ReplayLogInit(&currentLog);
 
-  // Combining wall-clock & CPU clock so that two games started at the same
-  // second still gets different seeds
-  currentSeed = ((u64)time(NULL) << 32) ^ (u64)clock();
+  currentSeed = seed;
   pcg32_srandom_r(&rng, currentSeed, 1);
 }
