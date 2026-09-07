@@ -1,4 +1,4 @@
-#include "pcg32.h"
+#include "../include/pcg32.h"
 
 u32 pcg32_random_r(pcg32_random *rng) {
   u64 oldstate = rng->state;
