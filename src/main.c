@@ -11,8 +11,8 @@
 #define CELL_SIZE 40
 
 #define PANEL_HEIGHT 90
-#define WINDOW_HEIGHT (COLUMNS * CELL_SIZE)
-#define WINDOW_WIDTH (ROWS * CELL_SIZE + PANEL_HEIGHT)
+#define WINDOW_WIDTH (COLUMNS * CELL_SIZE)
+#define WINDOW_HEIGHT (ROWS * CELL_SIZE + PANEL_HEIGHT)
 
 typedef struct {
   bool revealed;
@@ -37,17 +37,22 @@ bool gameOver = false;
 bool won = false;
 int BOMBS = 10;
 int revealCount = 0;
+bool firstClick = false;
 
 bool CheckWin(void) { return revealCount == (ROWS * COLUMNS - BOMBS); }
 
-void FisherYatesShuffle(void) {
+void FisherYatesShuffle(int safeRow, int safeCol) {
   int n = ROWS * COLUMNS;
+  int safeIndex = safeRow * COLUMNS + safeCol;
 
-  int *idx = (int *)malloc(n * sizeof(int));
-  for (int i = 0; i < n; i++)
-    idx[i] = i;
-
+  int *idx = (int *)malloc((n - 1) * sizeof(int));
+  int k = 0;
   for (int i = 0; i < n; i++) {
+    if (i != safeIndex)
+      idx[i] = i;
+  }
+  int remaining = n - 1;
+  for (int i = 0; i < remaining; i++) {
     int j = rand() % (i + 1);
     int temp = idx[i];
     idx[i] = idx[j];
@@ -59,6 +64,7 @@ void FisherYatesShuffle(void) {
     int col = idx[i] % COLUMNS;
     grid[row][col].hasMines = true;
   }
+  free(idx);
 
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLUMNS; c++) {
@@ -200,10 +206,10 @@ void floodFill(int row, int col) {
 
 void NewGame(void) {
   InitGrid();
-  FisherYatesShuffle();
   gameOver = false;
   won = false;
   revealCount = 0;
+  firstClick = false;
 }
 
 void HandleInput(void) {
@@ -226,6 +232,10 @@ void HandleInput(void) {
 
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
     if (!grid[row][col].flagged) {
+      if (!firstClick) {
+        FisherYatesShuffle(row, col);
+        firstClick = true;
+      }
       floodFill(row, col);
     }
   }
