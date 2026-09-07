@@ -15,4 +15,9 @@
 #define BTN_WIDTH 140
 #define BTN_HEIGHT 40
 
+// Single source of truth for the replay file path. The game saves and loads
+// this exact file (see input.c); keeping it in one place prevents the
+// save/load path from ever drifting apart.
+#define REPLAY_PATH "replay.msr"
+
 #endif // !CONFIG_H

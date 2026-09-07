@@ -1,4 +1,4 @@
-#ifndef DEBUG
+#ifndef PCG32_H
 #define PCG32_H
 
 #include <stdint.h>
@@ -33,4 +33,4 @@ u32 pcg32_random_r(pcg32_random *rng);
 // that plain `rand() % bound` has
 u32 pcg32_boundedrand_r(pcg32_random *rng, u32 bound);
 
-#endif // !DEBUG PCG32_H
+#endif // !PCG32_H

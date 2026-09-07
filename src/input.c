@@ -16,7 +16,7 @@ void HandleInput(void) {
   }
 
   if (IsKeyPressed(KEY_S)) {
-    if (SaveReplay("replay.msr")) {
+    if (SaveReplay(REPLAY_PATH)) {
       TraceLog(LOG_INFO, "Saved replay.msr (%d events)", currentLog.count);
     } else {
       TraceLog(LOG_WARNING, "Failed to save replay.msr");
@@ -24,7 +24,7 @@ void HandleInput(void) {
   }
 
   if (IsKeyPressed(KEY_L)) {
-    if (StartReplayPlayback("reoplay.msr")) {
+    if (StartReplayPlayback(REPLAY_PATH)) {
       TraceLog(LOG_INFO, "Replaying replay.msr");
     } else {
       TraceLog(LOG_WARNING, "Failed to load replay.msr");
