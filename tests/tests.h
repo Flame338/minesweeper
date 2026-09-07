@@ -7,7 +7,9 @@
 #include "../include/board.h"
 #include "../include/replay.h"
 
-/* Pass/fail counters, defined once in test_runner.c, incremented by CHECK. */
+/* Pass/fail counters, defined once in test_runner.c. These count individual
+ * CHECK(...) assertions (so a loop of 10,000 draws contributes 10,000). The
+ * runner reports both the per-test-case result and this assertion total. */
 extern int g_tests_pass;
 extern int g_tests_fail;
 

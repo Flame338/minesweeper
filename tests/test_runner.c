@@ -64,11 +64,25 @@ int main(void) {
   };
 
   size_t n = sizeof(tests) / sizeof(tests[0]);
+  int tests_passed = 0;
+  int tests_failed = 0;
   for (size_t i = 0; i < n; i++) {
+    int fail_before = g_tests_fail;
     printf("[ RUN ] %s\n", tests[i].name);
     tests[i].fn();
+    if (g_tests_fail == fail_before) {
+      tests_passed++;
+      printf("[ PASS] %s\n", tests[i].name);
+    } else {
+      tests_failed++;
+      printf("[ FAIL] %s\n", tests[i].name);
+    }
   }
 
-  printf("\n%d passed, %d failed\n", g_tests_pass, g_tests_fail);
-  return g_tests_fail ? 1 : 0;
+  /* g_tests_pass/g_tests_fail are assertion-level; the test count is the
+   * meaningful "17 tests" figure. */
+  printf("\n%zu tests: %d passed, %d failed (%d assertions: %d passed, %d failed)\n",
+         n, tests_passed, tests_failed, g_tests_pass + g_tests_fail,
+         g_tests_pass, g_tests_fail);
+  return tests_failed ? 1 : 0;
 }
