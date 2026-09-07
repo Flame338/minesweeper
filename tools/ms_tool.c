@@ -14,11 +14,13 @@
  *   load PATH          StartReplayPlayback(PATH)
  *   step DT            UpdateReplayPlayback(DT)
  *   replay PATH [--inspect]  load PATH, step to the end, then dump
+ *   hint               solver deductions: safe cells, mines, and a safe hint
  *   quit | EOF         exit
  */
 #include "../include/board.h"
 #include "../include/config.h"
 #include "../include/replay.h"
+#include "../include/solver.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -164,6 +166,24 @@ int main(int argc, char **argv) {
       } else {
         printf("usage: replay PATH [--inspect]\n");
       }
+    } else if (strcmp(cmd, "hint") == 0) {
+      int safe[ROWS * COLUMNS], mines[ROWS * COLUMNS];
+      int ns = SolverSafeCells(safe);
+      int nm = SolverMines(mines);
+      printf("consistent=%d safe=%d mines=%d\n", SolverIsConsistent() ? 1 : 0,
+             ns, nm);
+      printf("safe:");
+      for (int i = 0; i < ns; i++)
+        printf(" (%d,%d)", safe[i] / COLUMNS, safe[i] % COLUMNS);
+      printf("\nmines:");
+      for (int i = 0; i < nm; i++)
+        printf(" (%d,%d)", mines[i] / COLUMNS, mines[i] % COLUMNS);
+      printf("\n");
+      int row, col;
+      if (SolverHint(&row, &col))
+        printf("hint -> (%d,%d)\n", row, col);
+      else
+        printf("hint -> none\n");
     } else {
       printf("unknown command: %s\n", cmd);
     }
