@@ -11,7 +11,6 @@ void HandleInput(void) {
 
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
       CheckCollisionPointRec(mouse, newGameButton)) {
-    TraceLog(LOG_INFO, "New Game button clicked");
     NewGame();
     return;
   }

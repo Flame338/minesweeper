@@ -26,6 +26,7 @@
 *.exe
 *.out
 *.app
+*.msr
 
 # Kernel Module Compile Results
 *.mod*
@@ -40,6 +41,9 @@ dkms.conf
 build/
 bin/
 obj/
+
+# Vendored third-party dependency (raylib) - downloaded separately, not source
+raylib/
 
 # IDE/Editor files
 .vscode/

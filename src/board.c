@@ -69,12 +69,10 @@ void FisherYatesShuffle(int safeRow, int safeCol) {
   ComputeNeighbourCounts();
 }
 
-void InitGrid() {
+void InitGrid(void) {
   for (int i = 0; i < ROWS; i++) {
     for (int j = 0; j < COLUMNS; j++) {
-      if (grid[i][j].hasMines) {
-        grid[i][j].revealed = true;
-      }
+      grid[i][j] = (Cell){0};
     }
   }
 }

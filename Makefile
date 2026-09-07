@@ -1,4 +1,4 @@
-# Makefile for Minesweeper (raylib) — Ubuntu / WSL
+# Makefile for Minesweeper (raylib) — Windows (MinGW-w64 / w64devkit)
 #
 # Expected project layout:
 #   .
@@ -24,9 +24,11 @@ SRC_DIR   := src
 INC_DIR   := include
 BUILD_DIR := build
 BIN_DIR   := bin
+RAYLIB_DIR := raylib
 
-# Output binary name
-TARGET := $(BIN_DIR)/minesweeper
+# Output binary name (.exe required on Windows; gcc appends it if omitted, but
+# the `run` target needs the real name to launch the built exe)
+TARGET := $(BIN_DIR)/minesweeper.exe
 
 # Find all source files automatically
 SOURCES := $(wildcard $(SRC_DIR)/*.$(SRC_EXT))
@@ -34,12 +36,13 @@ OBJECTS := $(patsubst $(SRC_DIR)/%.$(SRC_EXT),$(BUILD_DIR)/%.o,$(SOURCES))
 
 # Compiler flags
 # -I$(INC_DIR): so #include "yourheader.h" resolves to include/
-# Uncomment/edit the two lines below only if raylib's headers/lib
-# are NOT already on your system's default search paths.
-CFLAGS  := -Wall -Wextra -std=c11 -I$(INC_DIR)
-# CFLAGS += -I/path/to/raylib/include
-LDFLAGS := -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
-# LDFLAGS += -L/path/to/raylib/lib
+# -I$(RAYLIB_DIR)/include: raylib public headers, vendored in ./raylib/
+CFLAGS  := -Wall -Wextra -std=c11 -I$(INC_DIR) -I$(RAYLIB_DIR)/include
+# Link against the vendored static raylib plus the Windows system libraries
+# that raylib's GLFW/Win32 backend requires (OpenGL, GDI, multimedia, user32,
+# shell32). -static-libgcc keeps libgcc_s_seh-1.dll out of the deployed exe.
+LDFLAGS := -L$(RAYLIB_DIR)/lib -lraylib -lopengl32 -lgdi32 -lwinmm \
+           -luser32 -lshell32 -lm -static-libgcc
 
 # Default target
 all: $(TARGET)
