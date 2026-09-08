@@ -27,7 +27,7 @@ static bool decidedSafe[ROWS * COLUMNS];
 static bool consistent = true;
 
 /* Build the constraint list from every revealed numbered (non-mine) cell. */
-static void collect_constraints(void) {
+static void collect_constraints(const Cell grid[ROWS][COLUMNS]) {
   constraintCount = 0;
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLUMNS; c++) {
@@ -64,7 +64,9 @@ static void collect_constraints(void) {
  * A leftover negative remaining (after the caller compares it against the
  * unknown set) means the flags contradict this number.
  */
-static int unknown_and_remaining(const Constraint *con, int unknown[MAX_NEIGHBOURS],
+static int unknown_and_remaining(const Constraint *con,
+                                 const Cell grid[ROWS][COLUMNS],
+                                 int unknown[MAX_NEIGHBOURS],
                                  int *remainingOut) {
   int n = 0;
   int remaining = con->mines;
@@ -108,8 +110,8 @@ static int contains(const int *arr, int n, int idx) {
 }
 
 /* Run constraint propagation to a fixed point; rebuilds all deduction state. */
-static void propagate(void) {
-  collect_constraints();
+static void propagate(const Cell grid[ROWS][COLUMNS]) {
+  collect_constraints(grid);
 
   for (int i = 0; i < ROWS * COLUMNS; i++) {
     decidedMine[i] = false;
@@ -131,7 +133,7 @@ static void propagate(void) {
     for (int a = 0; a < constraintCount; a++) {
       int unA[MAX_NEIGHBOURS];
       int remA;
-      int nA = unknown_and_remaining(&constraints[a], unA, &remA);
+      int nA = unknown_and_remaining(&constraints[a], grid, unA, &remA);
 
       if (remA < 0 || remA > nA || (nA == 0 && remA != 0)) {
         consistent = false;
@@ -162,7 +164,7 @@ static void propagate(void) {
           continue;
         int unB[MAX_NEIGHBOURS];
         int remB;
-        int nB = unknown_and_remaining(&constraints[b], unB, &remB);
+        int nB = unknown_and_remaining(&constraints[b], grid, unB, &remB);
 
         if (remB < 0 || remB > nB || (nB == 0 && remB != 0)) {
           consistent = false;
@@ -198,13 +200,14 @@ static void propagate(void) {
   }
 }
 
-bool SolverIsConsistent(void) {
-  propagate();
+bool SolverIsConsistent(const Cell grid[ROWS][COLUMNS]) {
+  propagate(grid);
   return consistent;
 }
 
-int SolverSafeCells(int out[ROWS * COLUMNS]) {
-  propagate();
+int SolverSafeCells(const Cell grid[ROWS][COLUMNS],
+                    int out[ROWS * COLUMNS]) {
+  propagate(grid);
   int count = 0;
   for (int i = 0; i < ROWS * COLUMNS; i++) {
     if (decidedSafe[i]) {
@@ -216,8 +219,9 @@ int SolverSafeCells(int out[ROWS * COLUMNS]) {
   return count;
 }
 
-int SolverMines(int out[ROWS * COLUMNS]) {
-  propagate();
+int SolverMines(const Cell grid[ROWS][COLUMNS],
+                int out[ROWS * COLUMNS]) {
+  propagate(grid);
   int count = 0;
   for (int i = 0; i < ROWS * COLUMNS; i++) {
     if (decidedMine[i] && !grid[i / COLUMNS][i % COLUMNS].flagged) {
@@ -229,8 +233,8 @@ int SolverMines(int out[ROWS * COLUMNS]) {
   return count;
 }
 
-bool SolverHint(int *row, int *col) {
-  propagate();
+bool SolverHint(const Cell grid[ROWS][COLUMNS], int *row, int *col) {
+  propagate(grid);
   if (!consistent)
     return false;
   for (int i = 0; i < ROWS * COLUMNS; i++) {

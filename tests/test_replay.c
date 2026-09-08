@@ -5,25 +5,25 @@
  */
 #include "tests.h"
 
+static Game g; /* zero-initialized fixture */
+
 void test_save_replay_fails_before_first_click(void) {
-  clean_board();
-  NewGameWithSeed(5);
+  GameNewWithSeed(&g, 5);
   /* No reveal yet -> no mines placed -> nothing meaningful to replay. */
-  CHECK(SaveReplay("build/_test_nofirst.msr") == false);
+  CHECK(GameSaveReplay(&g, "build/_test_nofirst.msr") == false);
 }
 
 void test_load_missing_file_fails(void) {
-  clean_board();
-  CHECK(StartReplayPlayback("build/_does_not_exist.msr") == false);
+  GameNewWithSeed(&g, 7);
+  CHECK(GameStartReplayPlayback(&g, "build/_does_not_exist.msr") == false);
 }
 
 void test_newgame_resets_state_after_replay(void) {
-  clean_board();
-  /* NewGameWithSeed fully resets the log and board; verify firstClick is off. */
-  NewGameWithSeed(99);
-  CHECK(firstClick == false);
-  CHECK(currentLog.count == 0);
-  CHECK(revealCount == 0);
-  CHECK(gameOver == false);
-  CHECK(won == false);
+  GameNewWithSeed(&g, 99);
+  /* GameNewWithSeed fully resets the log and board; verify firstClick is off. */
+  CHECK(g.firstClick == false);
+  CHECK(g.log.count == 0);
+  CHECK(g.revealCount == 0);
+  CHECK(g.gameOver == false);
+  CHECK(g.won == false);
 }

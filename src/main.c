@@ -10,34 +10,31 @@ int main(void) {
   InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);
   SetTargetFPS(TARGET_FPS);
 
-  ReplayLogInit(&currentLog);
-  ReplayLogInit(&activeReplay);
-
-  NewGame();
+  Game game = {0};
+  GameNew(&game);
 
   while (!WindowShouldClose()) {
     f32 dt = GetFrameTime();
 
-    HandleInput();
+    HandleInput(&game);
 
-    if (isReplaying) {
-      UpdateReplayPlayback(dt);
+    if (game.isReplaying) {
+      GameUpdateReplayPlayback(&game, dt);
     } else {
-      gameClock += dt;
+      game.clock += dt;
     }
 
-    if (!gameOver && CheckWin()) {
-      won = true;
+    if (!game.gameOver && GameCheckWin(&game)) {
+      game.won = true;
     }
 
     BeginDrawing();
     ClearBackground(RAYWHITE);
-    DrawMinesweeperGrid();
+    DrawMinesweeperGrid(&game);
     EndDrawing();
   }
 
-  ReplayLogFree(&currentLog);
-  ReplayLogFree(&activeReplay);
+  GameFree(&game);
 
   CloseWindow();
   return 0;

@@ -6,13 +6,13 @@
  * that the test suite can check against.
  *
  *   new [--seed N]     fresh game; --seed N for a deterministic layout
- *   reveal R C         PerformReveal(r, c)
- *   flag R C           PerformToggleFlag(r, c)
+ *   reveal R C         GameReveal(r, c)
+ *   flag R C           GameToggleFlag(r, c)
  *   dump [--inspect]   ASCII grid; --inspect also shows hidden mines (M)
  *   state              seed, first-click, counts, flags, replay log lengths
- *   save PATH          SaveReplay(PATH)
- *   load PATH          StartReplayPlayback(PATH)
- *   step DT            UpdateReplayPlayback(DT)
+ *   save PATH          GameSaveReplay(PATH)
+ *   load PATH          GameStartReplayPlayback(PATH)
+ *   step DT            GameUpdateReplayPlayback(DT)
  *   replay PATH [--inspect]  load PATH, step to the end, then dump
  *   hint               solver deductions: safe cells, mines, and a safe hint
  *   quit | EOF         exit
@@ -26,12 +26,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void dump_board(int inspect) {
-  printf("grid (%dx%d) bombs=%d:\n", ROWS, COLUMNS, BOMBS);
+static void dump_board(const Game *game, int inspect) {
+  printf("grid (%dx%d) bombs=%d:\n", ROWS, COLUMNS, game->bombCount);
   for (int r = 0; r < ROWS; r++) {
     printf("  ");
     for (int c = 0; c < COLUMNS; c++) {
-      Cell cell = grid[r][c];
+      Cell cell = game->grid[r][c];
       char ch;
       if (cell.flagged) {
         ch = 'F';
@@ -53,13 +53,14 @@ static void dump_board(int inspect) {
   }
 }
 
-static void dump_state(void) {
+static void dump_state(const Game *game) {
   printf("seed=%llu firstClick=%d firstClick=(%d,%d) revealCount=%d bombs=%d "
          "gameOver=%d won=%d replaying=%d clock=%.3f log=%d replay=%d\n",
-         (unsigned long long)currentSeed, firstClick ? 1 : 0, firstClickRow,
-         firstClickCol, revealCount, BOMBS, gameOver ? 1 : 0, won ? 1 : 0,
-         isReplaying ? 1 : 0, (double)gameClock, currentLog.count,
-         activeReplay.count);
+         (unsigned long long)game->seed, game->firstClick ? 1 : 0,
+         game->firstClickRow, game->firstClickCol, game->revealCount,
+         game->bombCount, game->gameOver ? 1 : 0, game->won ? 1 : 0,
+         game->isReplaying ? 1 : 0, (double)game->clock, game->log.count,
+         game->playback.count);
 }
 
 static int parse_int(const char *s, int *out) {
@@ -76,9 +77,8 @@ int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
 
-  ReplayLogInit(&currentLog);
-  ReplayLogInit(&activeReplay);
-  NewGame(); /* start with a playable board; `new --seed N` to make it stable */
+  Game game = {0};
+  GameNew(&game); /* start with a playable board; `new --seed N` for stable */
 
   char line[256];
   printf("ms_tool: type a command (new/reveal/flag/dump/state/save/load/step/replay/quit)\n");
@@ -105,16 +105,16 @@ int main(int argc, char **argv) {
     } else if (strcmp(cmd, "new") == 0) {
       if (n >= 3 && strcmp(a1, "--seed") == 0) {
         long long seed = atoll(a2);
-        NewGameWithSeed((u64)seed);
-        printf("new game seeded %lld\n", (long long)currentSeed);
+        GameNewWithSeed(&game, (u64)seed);
+        printf("new game seeded %lld\n", (long long)game.seed);
       } else {
-        NewGame();
-        printf("new game seeded %llu\n", (unsigned long long)currentSeed);
+        GameNew(&game);
+        printf("new game seeded %llu\n", (unsigned long long)game.seed);
       }
     } else if (strcmp(cmd, "reveal") == 0) {
       int r, c;
       if (n >= 3 && parse_int(a1, &r) && parse_int(a2, &c)) {
-        PerformReveal(r, c);
+        GameReveal(&game, r, c);
         printf("revealed (%d,%d)\n", r, c);
       } else {
         printf("usage: reveal R C\n");
@@ -122,44 +122,44 @@ int main(int argc, char **argv) {
     } else if (strcmp(cmd, "flag") == 0) {
       int r, c;
       if (n >= 3 && parse_int(a1, &r) && parse_int(a2, &c)) {
-        PerformToggleFlag(r, c);
+        GameToggleFlag(&game, r, c);
         printf("toggled flag (%d,%d)\n", r, c);
       } else {
         printf("usage: flag R C\n");
       }
     } else if (strcmp(cmd, "dump") == 0) {
-      dump_board(n >= 2 && strcmp(a1, "--inspect") == 0);
+      dump_board(&game, n >= 2 && strcmp(a1, "--inspect") == 0);
     } else if (strcmp(cmd, "state") == 0) {
-      dump_state();
+      dump_state(&game);
     } else if (strcmp(cmd, "save") == 0) {
       if (n >= 2) {
         printf("save %s -> %s\n", a1,
-               SaveReplay(a1) ? "OK" : "FAIL");
+               GameSaveReplay(&game, a1) ? "OK" : "FAIL");
       } else {
         printf("usage: save PATH\n");
       }
     } else if (strcmp(cmd, "load") == 0) {
       if (n >= 2) {
         printf("load %s -> %s\n", a1,
-               StartReplayPlayback(a1) ? "OK" : "FAIL");
+               GameStartReplayPlayback(&game, a1) ? "OK" : "FAIL");
       } else {
         printf("usage: load PATH\n");
       }
     } else if (strcmp(cmd, "step") == 0) {
       double dt = n >= 2 ? atof(a1) : 0.0;
-      UpdateReplayPlayback((f32)dt);
+      GameUpdateReplayPlayback(&game, (f32)dt);
       printf("stepped %.3f\n", dt);
     } else if (strcmp(cmd, "replay") == 0) {
       if (n >= 2) {
         int inspect = n >= 3 && strcmp(a2, "--inspect") == 0;
-        if (StartReplayPlayback(a1)) {
+        if (GameStartReplayPlayback(&game, a1)) {
           int guard = 0;
-          while (isReplaying && guard < 100000) {
-            UpdateReplayPlayback(0.05f);
+          while (game.isReplaying && guard < 100000) {
+            GameUpdateReplayPlayback(&game, 0.05f);
             guard++;
           }
           printf("replay of %s finished (guard=%d)\n", a1, guard);
-          dump_board(inspect);
+          dump_board(&game, inspect);
         } else {
           printf("replay %s -> FAIL\n", a1);
         }
@@ -168,10 +168,10 @@ int main(int argc, char **argv) {
       }
     } else if (strcmp(cmd, "hint") == 0) {
       int safe[ROWS * COLUMNS], mines[ROWS * COLUMNS];
-      int ns = SolverSafeCells(safe);
-      int nm = SolverMines(mines);
-      printf("consistent=%d safe=%d mines=%d\n", SolverIsConsistent() ? 1 : 0,
-             ns, nm);
+      int ns = SolverSafeCells(game.grid, safe);
+      int nm = SolverMines(game.grid, mines);
+      printf("consistent=%d safe=%d mines=%d\n",
+             SolverIsConsistent(game.grid) ? 1 : 0, ns, nm);
       printf("safe:");
       for (int i = 0; i < ns; i++)
         printf(" (%d,%d)", safe[i] / COLUMNS, safe[i] % COLUMNS);
@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
         printf(" (%d,%d)", mines[i] / COLUMNS, mines[i] % COLUMNS);
       printf("\n");
       int row, col;
-      if (SolverHint(&row, &col))
+      if (SolverHint(game.grid, &row, &col))
         printf("hint -> (%d,%d)\n", row, col);
       else
         printf("hint -> none\n");
@@ -189,7 +189,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  ReplayLogFree(&currentLog);
-  ReplayLogFree(&activeReplay);
+  GameFree(&game);
   return 0;
 }

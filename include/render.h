@@ -14,7 +14,7 @@ extern Rectangle hintButton;
 extern HintResult lastHintResult;
 extern bool hasHintResult;
 
-void DrawMinesweeperGrid(void);
-void DrawUI(void);
+void DrawMinesweeperGrid(const Game *game);
+void DrawUI(const Game *game);
 
-#endif // RENDER_H
+#endif // !RENDER_H

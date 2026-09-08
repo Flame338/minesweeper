@@ -1,6 +1,8 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-void HandleInput(void);
+#include "board.h"
+
+void HandleInput(Game *game);
 
 #endif // !INPUT_H

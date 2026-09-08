@@ -10,6 +10,13 @@ raylib-free so the rules can be tested and scripted headlessly.
 **Board**:
 The fixed 9×9 arrangement of Cells. One board per game.
 
+**Game**:
+The unit of play that owns a session's mutable state: the Board, the Win/Lose
+outcome, the Seed and its RNG, the Hint budget and suggestion, and the Replay
+logs. In code it is the single `Game` struct, passed explicitly across every
+module seam — no other module holds per-game state.
+_Avoid_: session, match
+
 **Cell**:
 A single square on the board. It has three independent facts: whether it is
 revealed, whether it is flagged, and whether it holds a Mine.

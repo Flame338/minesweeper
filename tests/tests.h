@@ -23,27 +23,13 @@ extern int g_tests_fail;
     }                                                                          \
   } while (0)
 
-/* Reset every piece of global game state to a known deterministic baseline.
- * Leaves the RNG seed alone; call NewGameWithSeed(seed) afterwards to get a
- * fully reproducible board. */
-static inline void clean_board(void) {
-  InitGrid();
-  gameOver = false;
-  won = false;
-  revealCount = 0;
-  firstClick = false;
-  firstClickRow = -1;
-  firstClickCol = -1;
-  isReplaying = false;
-  BOMBS = 10;
-  gameClock = 0.0f;
-  hintsRemaining = HINT_BUDGET;
-  hasHint = false;
-  hintRow = hintCol = -1;
-  ReplayLogFree(&currentLog);
-  ReplayLogInit(&currentLog);
-  ReplayLogFree(&activeReplay);
-  ReplayLogInit(&activeReplay);
-}
+/* Each test file keeps its own `static Game g;` fixture (zero-initialized at
+ * file scope). A case starts with either:
+ *
+ *   GameNewWithSeed(&g, seed);  // deterministic, playable game
+ *   GameReset(&g);              // blank board to build an arbitrary state on
+ *
+ * The old clean_board() no longer exists: a fresh Game *is* the reset.
+ */
 
 #endif /* !TESTS_H */

@@ -13,18 +13,17 @@
  *    pcg32.h), the mine layout is fully reproducible from just two things:
  *    the seed and which cell was clicked first (mine placement excludes
  *    that cell). A replay file stores those and regenerates the layout on
- *    load by calling the exact same FisherYatesShuffle() the live game
- *    used — no need to also snapshot the resulting 81-cell board.
+ *    load by calling the exact same GamePlantMines() the live game used —
+ *    no need to also snapshot the resulting 81-cell board.
  *
  * 2. We record high-level *intents* (reveal cell / toggle flag at a given
  *    timestamp), not raw mouse coordinates or per-cell flood-fill results.
  *    Flood fill is deterministic given the mine layout, so replaying the
- *    same intent through the same PerformReveal()/PerformToggleFlag()
- *    functions that live play uses (board.h) reproduces the exact same
- *    board state. This "single code path for live input and replay input"
- *    pattern is also the property a future constant-propagation solver will
- *    want: it evaluates hypothetical reveals through the same logic, not a
- *    reimplementation of it.
+ *    same intent through the same GameReveal()/GameToggleFlag() functions
+ *    that live play uses (board.h) reproduces the exact same board state.
+ *    This "single code path for live input and replay input" pattern is
+ *    also what a constraint-propagation solver wants: it evaluates
+ *    hypothetical reveals through the same logic, not a reimplementation.
  *
  * 3. On-disk layout (native struct packing — fine for a single-machine
  *    tool; switch to explicit fixed-width serialization if you ever need
@@ -32,6 +31,13 @@
  *
  *      ReplayHeader (internal to replay.c; seed + first click + counts)
  *      ReplayEvent[header.eventCount]
+ *
+ * A Game owns two logs: `log` (events recorded during live play) and
+ * `playback` (events loaded from disk, driving the board while the game's
+ * isReplaying flag is set). The functions below operate on whichever log
+ * the caller names; the Game-level entry points (GameSaveReplay,
+ * GameStartReplayPlayback, GameUpdateReplayPlayback) wire those logs to the
+ * live game state. See board.h for the Game type.
  * ------------------------------------------------------------------------ */
 
 typedef float f32;
@@ -55,32 +61,26 @@ typedef struct {
   int capacity;
 } ReplayLog;
 
-// Events recorded during the live game currently in progress
-extern ReplayLog currentLog;
-
-// Events loaded from disk, currently being played back
-extern ReplayLog activeReplay;
-
-// True while a loaded replay is driving the board instead of live input
-extern bool isReplaying;
-
-// Seconds elapsed since the current game (live or replay) state
-extern f32 gameClock;
+typedef struct Game Game;
 
 void ReplayLogInit(ReplayLog *log);
 void ReplayLogFree(ReplayLog *log);
-void ReplayLogPush(ReplayLog *log, EventType type, int row, int col);
 
-// Writes `currentLog` plus the current game's seed / first-click to `path`.
-// Fails if no mines have been placed yet (nothing to replay)
-bool SaveReplay(const char *path);
+// Appends an event stamped with `timeStamp` (normally the game's clock).
+void ReplayLogPush(ReplayLog *log, f32 timeStamp, EventType type, int row,
+                   int col);
 
-// Loads `path`, regenerates its mine layout, and starts driving the board
-// from its event log. Board input should be ignored while isReplaying
-bool StartReplayPlayback(const char *path);
+// Writes `game->log` plus the game's seed / first-click to `path`.
+// Fails if no mines have been placed yet (nothing to replay).
+bool GameSaveReplay(const Game *game, const char *path);
+
+// Loads `path` into a fresh game state, regenerates its mine layout, and
+// starts driving the board from its event log. Board input should be
+// ignored while game->isReplaying is true.
+bool GameStartReplayPlayback(Game *game, const char *path);
 
 // Advances playback by `dt` seconds, applying any events whose timestamp
-// has been reached. Call once per frame while isReplaying is true
-void UpdateReplayPlayback(f32 dt);
+// has been reached. Call once per frame while game->isReplaying is true.
+void GameUpdateReplayPlayback(Game *game, f32 dt);
 
 #endif // !REPLAY_H
