@@ -19,7 +19,7 @@ void HandleInput(Game *game) {
   }
 
   if (IsKeyPressed(KEY_S)) {
-    if (GameSaveReplay(game, REPLAY_PATH)) {
+    if (GameCanSave(game) && GameSaveReplay(game, REPLAY_PATH)) {
       TraceLog(LOG_INFO, "Saved replay.msr (%d events)", game->log.count);
     } else {
       TraceLog(LOG_WARNING, "Failed to save replay.msr");
@@ -36,19 +36,19 @@ void HandleInput(Game *game) {
   }
 
   /* Request a hint: mouse click on the Hint button or the H key. Only legal
-   * during active live play (not replay, not after win/loss). */
+   * during active live play (not replay, not after win/loss) — the Game
+   * module owns that rule (GameCanHint). */
   bool hintClicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
                      CheckCollisionPointRec(mouse, hintButton);
   if (hintClicked || IsKeyPressed(KEY_H)) {
-    if (!game->isReplaying && !game->gameOver && !game->won) {
+    if (GameCanHint(game)) {
       lastHintResult = GameHint(game, NULL, NULL);
       hasHintResult = (lastHintResult != HINT_OK);
     }
   }
 
-  if (game->isReplaying)
-    return;
-  if (game->gameOver)
+  /* Board clicks (reveal / flag) only during live, unfinished play. */
+  if (!GameCanReveal(game))
     return;
 
   int col = (int)(mouse.x / CELL_SIZE);

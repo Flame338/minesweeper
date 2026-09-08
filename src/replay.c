@@ -52,8 +52,8 @@ void ReplayLogPush(ReplayLog *log, f32 timeStamp, EventType type, int row,
 }
 
 bool GameSaveReplay(const Game *game, const char *path) {
-  if (!game->firstClick)
-    return false; // nothing meaningful to replay yet — no mines placed
+  if (!GameCanSave(game))
+    return false; // nothing meaningful to replay yet / not a live game
 
   FILE *f = fopen(path, "wb");
   if (!f)
@@ -175,9 +175,6 @@ void GameUpdateReplayPlayback(Game *game, f32 dt) {
     }
     game->playbackIndex++;
   }
-
-  if (!game->gameOver && GameCheckWin(game))
-    game->won = true;
 
   if (game->playbackIndex >= game->playback.count) {
     game->isReplaying = false; // playback done; board stays on final state

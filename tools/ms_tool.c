@@ -167,23 +167,29 @@ int main(int argc, char **argv) {
         printf("usage: replay PATH [--inspect]\n");
       }
     } else if (strcmp(cmd, "hint") == 0) {
-      int safe[ROWS * COLUMNS], mines[ROWS * COLUMNS];
-      int ns = SolverSafeCells(game.grid, safe);
-      int nm = SolverMines(game.grid, mines);
-      printf("consistent=%d safe=%d mines=%d\n",
-             SolverIsConsistent(game.grid) ? 1 : 0, ns, nm);
-      printf("safe:");
-      for (int i = 0; i < ns; i++)
-        printf(" (%d,%d)", safe[i] / COLUMNS, safe[i] % COLUMNS);
-      printf("\nmines:");
-      for (int i = 0; i < nm; i++)
-        printf(" (%d,%d)", mines[i] / COLUMNS, mines[i] % COLUMNS);
-      printf("\n");
-      int row, col;
-      if (SolverHint(game.grid, &row, &col))
-        printf("hint -> (%d,%d)\n", row, col);
-      else
+      /* One analyse pass: consistency + both deduced sets (ADR-0003). */
+      SolverResult r;
+      SolverAnalyse(game.grid, &r);
+      printf("consistent=%d safe=%d mines=%d\n", r.consistent ? 1 : 0,
+             r.safeCount, r.mineCount);
+      if (r.consistent) {
+        printf("safe:");
+        for (int i = 0; i < r.safeCount; i++)
+          printf(" (%d,%d)", r.safe[i] / COLUMNS, r.safe[i] % COLUMNS);
+        printf("\nmines:");
+        for (int i = 0; i < r.mineCount; i++)
+          printf(" (%d,%d)", r.mine[i] / COLUMNS, r.mine[i] % COLUMNS);
+        printf("\n");
+        if (r.safeCount > 0)
+          printf("hint -> (%d,%d)\n", r.safe[0] / COLUMNS,
+                 r.safe[0] % COLUMNS);
+        else
+          printf("hint -> none\n");
+      } else {
+        printf("safe:\n"); /* no lists on an inconsistent board */
+        printf("mines:\n");
         printf("hint -> none\n");
+      }
     } else {
       printf("unknown command: %s\n", cmd);
     }

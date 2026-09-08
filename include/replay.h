@@ -71,7 +71,9 @@ void ReplayLogPush(ReplayLog *log, f32 timeStamp, EventType type, int row,
                    int col);
 
 // Writes `game->log` plus the game's seed / first-click to `path`.
-// Fails if no mines have been placed yet (nothing to replay).
+// Refuses (false) unless the context is a coherent live game — mines placed
+// (firstClick), at least one recorded move, and not replaying (GameCanSave;
+// see ADR-0003). A replay context is never savable.
 bool GameSaveReplay(const Game *game, const char *path);
 
 // Loads `path` into a fresh game state, regenerates its mine layout, and

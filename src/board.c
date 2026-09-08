@@ -38,6 +38,20 @@ bool GameCheckWin(const Game *game) {
   return game->revealCount == (ROWS * COLUMNS - game->bombCount);
 }
 
+bool GameCanReveal(const Game *game) {
+  /* Live play only: playback drives the board itself, and a finished game
+   * (won or lost) takes no more clicks. */
+  return !game->isReplaying && !game->gameOver && !game->won;
+}
+
+bool GameCanHint(const Game *game) {
+  return !game->isReplaying && !game->gameOver && !game->won;
+}
+
+bool GameCanSave(const Game *game) {
+  return !game->isReplaying && game->firstClick && game->log.count > 0;
+}
+
 void GameComputeNeighbourCounts(Game *game) {
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLUMNS; c++) {
@@ -149,6 +163,10 @@ void GameReveal(Game *game, int row, int col) {
     ReplayLogPush(&game->log, game->clock, EVT_REVEAL, row, col);
   }
   GameFloodFill(game, row, col);
+
+  if (!game->gameOver && GameCheckWin(game)) {
+    game->won = true;
+  }
 }
 
 void GameToggleFlag(Game *game, int row, int col) {
@@ -183,19 +201,22 @@ HintResult GameHint(Game *game, int *row, int *col) {
   if (game->hintsRemaining <= 0)
     return HINT_EXHAUSTED;
 
-  if (!SolverIsConsistent(game->grid))
-    return HINT_INCONSISTENT;
+  SolverResult r;
+  SolverAnalyse(game->grid, &r);
 
-  int r, c;
-  if (!SolverHint(game->grid, &r, &c)) {
+  if (!r.consistent)
+    return HINT_INCONSISTENT;
+  if (r.safeCount == 0)
     return has_revealed_number(game) ? HINT_STUCK : HINT_NO_INFO;
-  }
+
+  int r2 = r.safe[0] / COLUMNS;
+  int c = r.safe[0] % COLUMNS;
 
   /* Re-requesting the same, still-active hint (nothing changed) costs nothing:
    * the board is unchanged so the suggestion is still exactly right. */
-  if (game->hasHint && game->hintRow == r && game->hintCol == c) {
+  if (game->hasHint && game->hintRow == r2 && game->hintCol == c) {
     if (row) {
-      *row = r;
+      *row = r2;
       *col = c;
     }
     return HINT_OK;
@@ -203,10 +224,10 @@ HintResult GameHint(Game *game, int *row, int *col) {
 
   game->hintsRemaining--;
   game->hasHint = true;
-  game->hintRow = r;
+  game->hintRow = r2;
   game->hintCol = c;
   if (row) {
-    *row = r;
+    *row = r2;
     *col = c;
   }
   return HINT_OK;

@@ -200,49 +200,29 @@ static void propagate(const Cell grid[ROWS][COLUMNS]) {
   }
 }
 
-bool SolverIsConsistent(const Cell grid[ROWS][COLUMNS]) {
+void SolverAnalyse(const Cell grid[ROWS][COLUMNS], SolverResult *out) {
   propagate(grid);
-  return consistent;
-}
 
-int SolverSafeCells(const Cell grid[ROWS][COLUMNS],
-                    int out[ROWS * COLUMNS]) {
-  propagate(grid);
-  int count = 0;
+  if (!consistent) {
+    /* Withhold the partial deductions of a broken board: an inconsistent
+     * board's safe/mine sets are not trustworthy, so report none (solver.h). */
+    out->consistent = false;
+    out->safeCount = 0;
+    out->mineCount = 0;
+    return;
+  }
+
+  out->consistent = true;
+  out->safeCount = 0;
+  out->mineCount = 0;
   for (int i = 0; i < ROWS * COLUMNS; i++) {
     if (decidedSafe[i]) {
-      if (out != NULL)
-        out[count] = i;
-      count++;
+      out->safe[out->safeCount++] = i;
     }
-  }
-  return count;
-}
-
-int SolverMines(const Cell grid[ROWS][COLUMNS],
-                int out[ROWS * COLUMNS]) {
-  propagate(grid);
-  int count = 0;
-  for (int i = 0; i < ROWS * COLUMNS; i++) {
+    /* Newly-deduced mines only: already-flagged cells are the assumption,
+     * not a deduction (matches the old SolverMines semantics). */
     if (decidedMine[i] && !grid[i / COLUMNS][i % COLUMNS].flagged) {
-      if (out != NULL)
-        out[count] = i;
-      count++;
+      out->mine[out->mineCount++] = i;
     }
   }
-  return count;
-}
-
-bool SolverHint(const Cell grid[ROWS][COLUMNS], int *row, int *col) {
-  propagate(grid);
-  if (!consistent)
-    return false;
-  for (int i = 0; i < ROWS * COLUMNS; i++) {
-    if (decidedSafe[i]) {
-      *row = i / COLUMNS;
-      *col = i % COLUMNS;
-      return true;
-    }
-  }
-  return false;
 }

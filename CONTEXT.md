@@ -75,7 +75,10 @@ happened. Replays store intent (which Cell was touched), never raw input.
 _Avoid_: action, move
 
 **Save replay**:
-Persisting a game's Seed, First-click Cell, and Replay log to disk.
+Persisting a game's Seed, First-click Cell, and Replay log to disk. Only a
+live game is savable — one whose log, Seed and First-click describe the same
+game, with at least one recorded move. A loaded replay context is never
+savable: its live log is empty, so saving would produce a meaningless file.
 _Avoid_: export, record
 
 **Load replay (playback)**:

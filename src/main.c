@@ -24,10 +24,6 @@ int main(void) {
       game.clock += dt;
     }
 
-    if (!game.gameOver && GameCheckWin(&game)) {
-      game.won = true;
-    }
-
     BeginDrawing();
     ClearBackground(RAYWHITE);
     DrawMinesweeperGrid(&game);

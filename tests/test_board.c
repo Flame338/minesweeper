@@ -146,3 +146,95 @@ void test_checkwin(void) {
   g.revealCount = ROWS * COLUMNS - g.bombCount - 1;
   CHECK(GameCheckWin(&g) == false);
 }
+
+/* Card 2: the Reveal seam owns Win. Revealing the last non-Mine cell through
+ * GameReveal (the one path live play, playback and ms_tool share) must set
+ * won — no driver re-derives it. */
+void test_reveal_seam_sets_won(void) {
+  GameReset(&g);
+  g.bombCount = 1;
+  g.grid[8][8].hasMines = true; /* single mine, bottom-right corner */
+  GameComputeNeighbourCounts(&g);
+
+  /* Mines are already placed by hand; GameReveal must not re-roll them. */
+  g.firstClick = true;
+  g.firstClickRow = 0;
+  g.firstClickCol = 0;
+
+  CHECK(g.won == false);
+  GameReveal(&g, 0, 0); /* flood fills everything except the mine */
+
+  CHECK(g.gameOver == false);
+  CHECK(g.won == true); /* the seam produced the Win, not a driver poll */
+  CHECK(g.revealCount == ROWS * COLUMNS - 1);
+}
+
+/* Losing through the seam sets gameOver (Lose) and never also sets won. */
+void test_reveal_seam_loses_does_not_win(void) {
+  GameReset(&g);
+  g.grid[4][4].hasMines = true;
+  GameComputeNeighbourCounts(&g);
+  g.firstClick = true; /* mines already placed; don't re-roll */
+
+  GameReveal(&g, 4, 4);
+
+  CHECK(g.gameOver == true);
+  CHECK(g.won == false);
+}
+
+/* --- Card 4: legality queries (ADR-0003) -------------------------------- */
+
+/* Reveal/hint are legal exactly during live, unfinished play. */
+void test_can_reveal_hint_live_only(void) {
+  GameReset(&g); /* fresh, unfinished, not replaying */
+  CHECK(GameCanReveal(&g) == true);
+  CHECK(GameCanHint(&g) == true);
+
+  g.isReplaying = true;
+  CHECK(GameCanReveal(&g) == false); /* playback drives the board itself */
+  CHECK(GameCanHint(&g) == false);
+  g.isReplaying = false;
+
+  g.gameOver = true;
+  CHECK(GameCanReveal(&g) == false);
+  CHECK(GameCanHint(&g) == false);
+  g.gameOver = false;
+
+  g.won = true;
+  CHECK(GameCanReveal(&g) == false); /* won is terminal: no more clicks */
+  CHECK(GameCanHint(&g) == false);
+}
+
+/* The budget is NOT part of GameCanHint: an exhausted request must still
+ * reach GameHint so it can report HINT_EXHAUSTED. */
+void test_can_hint_ignores_budget(void) {
+  GameReset(&g);
+  g.hintsRemaining = 0;
+  CHECK(GameCanHint(&g) == true);
+  int r, c;
+  CHECK(GameHint(&g, &r, &c) == HINT_EXHAUSTED);
+}
+
+/* Saving needs a coherent live game: mines placed AND a real log. A fresh
+ * game has neither. */
+void test_can_save_requires_live_log(void) {
+  GameReset(&g);
+  CHECK(GameCanSave(&g) == false); /* no first click, no log */
+
+  g.firstClick = true; /* mines "placed", but the log is still empty */
+  CHECK(GameCanSave(&g) == false); /* nothing recorded yet */
+
+  g.log.count = 1; /* a move was made (tests may fake the buffer) */
+  CHECK(GameCanSave(&g) == true);
+
+  g.isReplaying = true; /* playback context: log is not being recorded */
+  CHECK(GameCanSave(&g) == false);
+  g.isReplaying = false;
+
+  g.gameOver = true; /* a lost live game keeps its log -> still savable */
+  CHECK(GameCanSave(&g) == true);
+  g.gameOver = false;
+
+  g.won = true; /* same for a won live game */
+  CHECK(GameCanSave(&g) == true);
+}

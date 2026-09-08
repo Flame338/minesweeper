@@ -25,10 +25,8 @@ Rectangle hintButton = {.x = 30.0f + BTN_WIDTH + 20.0f,
 HintResult lastHintResult = HINT_OK;
 bool hasHintResult = false;
 
-/* True when the Hint control is usable: live play, not over, budget left. */
 static bool hint_enabled(const Game *game) {
-  return !game->isReplaying && !game->gameOver && !game->won &&
-         game->hintsRemaining > 0;
+  return GameCanHint(game) && game->hintsRemaining > 0;
 }
 
 /* Pulsing gold outline around the suggested safe cell. */
@@ -93,7 +91,9 @@ void DrawUI(const Game *game) {
     status = "Game Over!";
     statusColor = RED;
   } else if (game->isReplaying) {
-    status = "Replaying... (S: save, L: load)";
+    /* Save is unavailable during replay (GameCanSave is false); the label
+     * no longer advertises it. */
+    status = "Replaying... (L: load)";
     statusColor = SKYBLUE;
   } else if (hasHintResult) {
     switch (lastHintResult) {

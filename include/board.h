@@ -68,12 +68,20 @@ void GameReset(Game *game);
 void GameFree(Game *game); /* releases the Replay logs */
 
 /* Player moves. These are the one seam live input, replay playback and the
- * tests all cross (see ADR-0001). */
+ * tests all cross (see ADR-0001). The seam owns the outcome: GameReveal sets
+ * won when the last safe Cell is revealed, and Lose (gameOver) when a Mine is
+ * revealed — drivers never re-derive Win/Lose themselves (see ADR-0003). */
 void GameReveal(Game *game, int row, int col);
 void GameToggleFlag(Game *game, int row, int col);
 
 // True when every non-Mine Cell has been Revealed.
 bool GameCheckWin(const Game *game);
+
+/* Legality queries (ADR-0003): the Game module owns "what may happen now",
+ * so drivers ask instead of re-deriving phase from the raw bools. */
+bool GameCanReveal(const Game *game);
+bool GameCanHint(const Game *game);
+bool GameCanSave(const Game *game);
 
 // Requests a guaranteed-safe hint. Spends the budget only when a *new* hint
 // is produced (re-showing the still-active hint costs nothing). On HINT_OK
