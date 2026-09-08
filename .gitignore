@@ -37,6 +37,7 @@ Module.symvers
 Mkfile.old
 dkms.conf
 *.md
+!CHANGELOG.md
 
 # Build directories
 build/

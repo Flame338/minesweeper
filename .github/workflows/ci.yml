@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [ master ]
+    tags: [ 'v*' ]
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    # The game rules (board/pcg32/replay/solver) and the test suite are
+    # raylib-free, so this builds with just gcc/make --- no raylib needed.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run the test suite
+        run: make test
+
+  release:
+    name: Build release (${{ matrix.platform }})
+    # Only build and publish release assets when a version tag is pushed.
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native Linux build: gcc, Linux raylib, X11/GL link libs.
+          - platform: linux
+            cc: gcc
+            asset: bin/minesweeper
+            artifact: minesweeper-linux-x64.tar.gz
+          # Windows cross-compiled from Linux (mingw-w64), win64_mingw-w64 raylib.
+          - platform: win
+            cc: x86_64-w64-mingw32-gcc
+            asset: bin/minesweeper.exe
+            artifact: minesweeper-windows-x64.tar.gz
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchain and Linux link libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-mingw-w64-x86-64 \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Fetch raylib (${{ matrix.platform }})
+        run: make raylib-get PLATFORM=${{ matrix.platform }}
+
+      - name: Build game
+        run: make PLATFORM=${{ matrix.platform }} CC=${{ matrix.cc }}
+
+      - name: Package and checksum
+        run: |
+          mkdir -p dist
+          tar -czf "dist/${{ matrix.artifact }}" -C bin "$(basename "${{ matrix.asset }}")"
+          sha256sum "dist/${{ matrix.artifact }}" > "dist/${{ matrix.artifact }}.sha256"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

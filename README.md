@@ -8,16 +8,32 @@
 
 ## Building
 
-Developed against **raylib 6.0** on **Windows (MinGW-w64 / w64devkit)**.
+Developed against **raylib 6.0**. The Makefile is cross-platform: `PLATFORM`
+defaults to the detected host OS (`win` or `linux`), and you can override it to
+cross-compile.
 
-- raylib is vendored as a local dependency in `raylib/` (headers in `raylib/include`,
-  static `libraylib.a` in `raylib/lib`). It is git-ignored; re-download it if missing:
-  `raylib-6.0_win64_mingw-w64.zip` from https://github.com/raysan5/raylib/releases
-- Build: `make` (produces `bin/minesweeper.exe`, statically linked)
-- Run: `make run`
+raylib is vendored (headers in `raylib/include`, a static `libraylib.a` in
+`raylib/lib`) and is git-ignored. `make raylib-get` downloads the pinned raylib
+6.0 release for the current `PLATFORM` and extracts it into `./raylib`; run it
+first if `raylib/` is missing. Headers are identical across platforms, so only
+the library file differs.
 
-The Makefile links the Windows system libraries raylib's backend needs
-(`-lopengl32 -lgdi32 -lwinmm -luser32 -lshell32`).
+- **Windows (MinGW-w64 / w64devkit):** `make raylib-get` then `make`
+  → `bin/minesweeper.exe` (statically linked, no raylib/GCC runtime DLLs).
+- **Linux (WSL / any x86_64 Linux):** `make raylib-get` then `make`
+  → `bin/minesweeper`. Needs the X11/GL system libs (e.g. `sudo apt install
+  libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev`) to link.
+- **Cross-compile Windows from Linux:** `make raylib-get PLATFORM=win` then
+  `make PLATFORM=win CC=x86_64-w64-mingw32-gcc`.
+- **Run:** `make run`
+
+The Makefile links the platform libraries raylib's desktop backend needs:
+Windows uses `-lopengl32 -lgdi32 -lwinmm -luser32 -lshell32`; Linux uses
+`-lGL -lm -lpthread -ldl -lrt -lX11`.
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs the test suite on
+every change and, on a `v*` tag, builds both the Linux and Windows binaries and
+attaches them (plus checksums) to the release.
 
 ## Testing & debug tool
 
