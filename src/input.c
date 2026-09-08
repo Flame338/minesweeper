@@ -8,26 +8,26 @@
 #include "../include/render.h"
 #include "../include/replay.h"
 
-void HandleInput(void) {
+void HandleInput(Game *game) {
   Vector2 mouse = GetMousePosition();
 
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
       CheckCollisionPointRec(mouse, newGameButton)) {
-    NewGame();
+    GameNew(game);
     hasHintResult = false; // a new game clears any pending hint message
     return;
   }
 
   if (IsKeyPressed(KEY_S)) {
-    if (SaveReplay(REPLAY_PATH)) {
-      TraceLog(LOG_INFO, "Saved replay.msr (%d events)", currentLog.count);
+    if (GameCanSave(game) && GameSaveReplay(game, REPLAY_PATH)) {
+      TraceLog(LOG_INFO, "Saved replay.msr (%d events)", game->log.count);
     } else {
       TraceLog(LOG_WARNING, "Failed to save replay.msr");
     }
   }
 
   if (IsKeyPressed(KEY_L)) {
-    if (StartReplayPlayback(REPLAY_PATH)) {
+    if (GameStartReplayPlayback(game, REPLAY_PATH)) {
       TraceLog(LOG_INFO, "Replaying replay.msr");
       hasHintResult = false; // a load replaces the board context
     } else {
@@ -36,19 +36,19 @@ void HandleInput(void) {
   }
 
   /* Request a hint: mouse click on the Hint button or the H key. Only legal
-   * during active live play (not replay, not after win/loss). */
+   * during active live play (not replay, not after win/loss) — the Game
+   * module owns that rule (GameCanHint). */
   bool hintClicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
                      CheckCollisionPointRec(mouse, hintButton);
   if (hintClicked || IsKeyPressed(KEY_H)) {
-    if (!isReplaying && !gameOver && !won) {
-      lastHintResult = RequestHint(NULL, NULL);
+    if (GameCanHint(game)) {
+      lastHintResult = GameHint(game, NULL, NULL);
       hasHintResult = (lastHintResult != HINT_OK);
     }
   }
 
-  if (isReplaying)
-    return;
-  if (gameOver)
+  /* Board clicks (reveal / flag) only during live, unfinished play. */
+  if (!GameCanReveal(game))
     return;
 
   int col = (int)(mouse.x / CELL_SIZE);
@@ -58,12 +58,12 @@ void HandleInput(void) {
     return;
 
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-    PerformReveal(row, col);
+    GameReveal(game, row, col);
     hasHintResult = false; // a move supersedes the transient message
   }
 
   if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-    PerformToggleFlag(row, col);
+    GameToggleFlag(game, row, col);
     hasHintResult = false;
   }
 }

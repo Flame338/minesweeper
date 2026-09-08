@@ -23,13 +23,6 @@ typedef struct {
   uint32_t eventCount;
 } ReplayHeader;
 
-ReplayLog currentLog = {0};
-ReplayLog activeReplay = {0};
-bool isReplaying = false;
-float gameClock = 0.0f;
-
-static int replayIndex = 0;
-
 void ReplayLogInit(ReplayLog *log) {
   log->events = NULL;
   log->count = 0;
@@ -43,23 +36,24 @@ void ReplayLogFree(ReplayLog *log) {
   log->capacity = 0;
 }
 
-void ReplayLogPush(ReplayLog *log, EventType type, int row, int col) {
+void ReplayLogPush(ReplayLog *log, f32 timeStamp, EventType type, int row,
+                   int col) {
   if (log->count >= log->capacity) {
     log->capacity = (log->capacity == 0) ? 64 : log->capacity * 2;
     log->events =
         realloc(log->events, (size_t)log->capacity * sizeof(ReplayEvent));
   }
   log->events[log->count++] = (ReplayEvent){
-      .timeStamp = gameClock,
+      .timeStamp = timeStamp,
       .type = (uint8_t)type,
       .row = (uint8_t)row,
       .col = (uint8_t)col,
   };
 }
 
-bool SaveReplay(const char *path) {
-  if (!firstClick)
-    return false; // nothing meaningful to replay yet — no mines placed
+bool GameSaveReplay(const Game *game, const char *path) {
+  if (!GameCanSave(game))
+    return false; // nothing meaningful to replay yet / not a live game
 
   FILE *f = fopen(path, "wb");
   if (!f)
@@ -70,11 +64,11 @@ bool SaveReplay(const char *path) {
       .version = REPLAY_VERSION,
       .rows = ROWS,
       .cols = COLUMNS,
-      .bombs = (uint16_t)BOMBS,
-      .firstClickRow = (uint16_t)firstClickRow,
-      .firstClickCol = (uint16_t)firstClickCol,
-      .seed = currentSeed,
-      .eventCount = (uint32_t)currentLog.count,
+      .bombs = (uint16_t)game->bombCount,
+      .firstClickRow = (uint16_t)game->firstClickRow,
+      .firstClickCol = (uint16_t)game->firstClickCol,
+      .seed = game->seed,
+      .eventCount = (uint32_t)game->log.count,
   };
 
   if (fwrite(&header, sizeof(header), 1, f) != 1) {
@@ -82,9 +76,9 @@ bool SaveReplay(const char *path) {
     return false;
   }
 
-  if (currentLog.count > 0 &&
-      fwrite(currentLog.events, sizeof(ReplayEvent), (size_t)currentLog.count,
-             f) != (size_t)currentLog.count) {
+  if (game->log.count > 0 &&
+      fwrite(game->log.events, sizeof(ReplayEvent), (size_t)game->log.count,
+             f) != (size_t)game->log.count) {
     fclose(f);
     return false;
   }
@@ -119,7 +113,10 @@ static bool LoadReplayFile(const char *path, ReplayLog *outLog,
     if (fread(outLog->events, sizeof(ReplayEvent), header.eventCount, f) !=
         header.eventCount) {
       fclose(f);
-      free(outLog->events);
+      /* Leave a valid, empty log behind: ReplayLogFree frees and resets
+       * count/capacity too, so a caller can't misread a failed load as a
+       * log that holds events. */
+      ReplayLogFree(outLog);
       return false;
     }
   }
@@ -129,66 +126,57 @@ static bool LoadReplayFile(const char *path, ReplayLog *outLog,
   return true;
 }
 
-bool StartReplayPlayback(const char *path) {
+bool GameStartReplayPlayback(Game *game, const char *path) {
   ReplayHeader header;
   ReplayLog loaded;
 
   if (!LoadReplayFile(path, &loaded, &header))
     return false;
 
-  ReplayLogFree(&activeReplay);
-  activeReplay = loaded;
+  // A loaded replay is a fresh game context: same single reset as GameNew,
+  // then the file's seed / first-click re-create the exact mine layout.
+  GameReset(game);
+  game->playback = loaded;
 
-  InitGrid();
-  BOMBS = header.bombs;
-  currentSeed = header.seed;
-  firstClickRow = header.firstClickRow;
-  firstClickCol = header.firstClickCol;
+  game->bombCount = header.bombs;
+  game->seed = header.seed;
+  game->firstClickRow = header.firstClickRow;
+  game->firstClickCol = header.firstClickCol;
 
   // Regenerate the exact same mine layout the original game had, by
   // re-seeding PCG32 with the stored seed and re-running the same shuffle
   // with the same "safe" first-click cell.
-  pcg32_srandom_r(&rng, currentSeed, 1);
-  FisherYatesShuffle(firstClickRow, firstClickCol);
+  pcg32_srandom_r(&game->rng, game->seed, 1);
+  GamePlantMines(game, game->firstClickRow, game->firstClickCol);
 
-  gameOver = false;
-  won = false;
-  revealCount = 0;
-  firstClick = true; // mines are already placed; PerformReveal must not re-roll
-  gameClock = 0.0f;
-  replayIndex = 0;
-  isReplaying = true;
-
-  /* A loaded replay is a fresh board context: restore the hint budget and drop
-   * any live-play suggestion. Hints stay disabled while isReplaying. */
-  hintsRemaining = HINT_BUDGET;
-  hasHint = false;
-  hintRow = hintCol = -1;
+  game->firstClick = true; // mines are already placed; GameReveal must not
+                           // re-roll
+  game->clock = 0.0f;
+  game->playbackIndex = 0;
+  game->isReplaying = true;
 
   return true;
 }
 
-void UpdateReplayPlayback(float dt) {
-  if (!isReplaying)
+void GameUpdateReplayPlayback(Game *game, f32 dt) {
+  if (!game->isReplaying)
     return;
 
-  gameClock += dt;
+  game->clock += dt;
 
-  while (replayIndex < activeReplay.count &&
-         activeReplay.events[replayIndex].timeStamp <= gameClock) {
-    ReplayEvent evt = activeReplay.events[replayIndex];
+  while (game->playbackIndex < game->playback.count &&
+         game->playback.events[game->playbackIndex].timeStamp <=
+             game->clock) {
+    ReplayEvent evt = game->playback.events[game->playbackIndex];
     if (evt.type == EVT_REVEAL) {
-      PerformReveal(evt.row, evt.col);
+      GameReveal(game, evt.row, evt.col);
     } else if (evt.type == EVT_TOGGLE_FLAG) {
-      PerformToggleFlag(evt.row, evt.col);
+      GameToggleFlag(game, evt.row, evt.col);
     }
-    replayIndex++;
+    game->playbackIndex++;
   }
 
-  if (!gameOver && CheckWin())
-    won = true;
-
-  if (replayIndex >= activeReplay.count) {
-    isReplaying = false; // playback done; board stays on final state
+  if (game->playbackIndex >= game->playback.count) {
+    game->isReplaying = false; // playback done; board stays on final state
   }
 }

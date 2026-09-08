@@ -25,26 +25,27 @@ Rectangle hintButton = {.x = 30.0f + BTN_WIDTH + 20.0f,
 HintResult lastHintResult = HINT_OK;
 bool hasHintResult = false;
 
-/* True when the Hint control is usable: live play, not over, budget left. */
-static bool hint_enabled(void) {
-  return !isReplaying && !gameOver && !won && hintsRemaining > 0;
+static bool hint_enabled(const Game *game) {
+  return GameCanHint(game) && game->hintsRemaining > 0;
 }
 
 /* Pulsing gold outline around the suggested safe cell. */
-static void DrawHintHighlight(void) {
-  if (!hasHint)
+static void DrawHintHighlight(const Game *game) {
+  if (!game->hasHint)
     return;
-  if (hintRow < 0 || hintRow >= ROWS || hintCol < 0 || hintCol >= COLUMNS)
+  if (game->hintRow < 0 || game->hintRow >= ROWS || game->hintCol < 0 ||
+      game->hintCol >= COLUMNS)
     return;
 
-  float t = sinf(gameClock * 5.0f) * 0.5f + 0.5f; // 0..1
+  float t = sinf(game->clock * 5.0f) * 0.5f + 0.5f; // 0..1
   unsigned char alpha = (unsigned char)(150 + (int)(100.0f * t));
   Color c = (Color){255, 215, 0, alpha}; // gold
-  Rectangle r = {hintCol * CELL_SIZE, hintRow * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+  Rectangle r = {game->hintCol * CELL_SIZE, game->hintRow * CELL_SIZE,
+                 CELL_SIZE, CELL_SIZE};
   DrawRectangleLinesEx(r, 3.0f, c);
 }
 
-void DrawUI(void) {
+void DrawUI(const Game *game) {
   int panelY = ROWS * CELL_SIZE;
 
   DrawRectangle(0, panelY, WINDOW_WIDTH, PANEL_HEIGHT,
@@ -63,7 +64,7 @@ void DrawUI(void) {
            newGameButton.y + (newGameButton.height - 18) / 2, 18, RAYWHITE);
 
   /* Hint button - shows the budget in the label; greys out when unavailable. */
-  bool enabled = hint_enabled();
+  bool enabled = hint_enabled(game);
   bool hintHovered = CheckCollisionPointRec(mouse, hintButton);
   Color hintColor;
   if (!enabled) {
@@ -73,7 +74,8 @@ void DrawUI(void) {
         hintHovered ? (Color){90, 200, 250, 255} : (Color){70, 130, 180, 255};
   }
   DrawRectangleRounded(hintButton, 0.3f, 8, hintColor);
-  const char *hintLabel = TextFormat("Hint (%d/%d)", hintsRemaining, HINT_BUDGET);
+  const char *hintLabel =
+      TextFormat("Hint (%d/%d)", game->hintsRemaining, HINT_BUDGET);
   int hintLabelWidth = MeasureText(hintLabel, 18);
   Color hintText = enabled ? RAYWHITE : (Color){140, 140, 150, 255};
   DrawText(hintLabel, hintButton.x + (hintButton.width - hintLabelWidth) / 2,
@@ -82,14 +84,16 @@ void DrawUI(void) {
   /* Status/message line (centered on the panel, below the buttons). */
   const char *status = NULL;
   Color statusColor = RAYWHITE;
-  if (won) {
+  if (game->won) {
     status = "You Win!";
     statusColor = GREEN;
-  } else if (gameOver) {
+  } else if (game->gameOver) {
     status = "Game Over!";
     statusColor = RED;
-  } else if (isReplaying) {
-    status = "Replaying... (S: save, L: load)";
+  } else if (game->isReplaying) {
+    /* Save is unavailable during replay (GameCanSave is false); the label
+     * no longer advertises it. */
+    status = "Replaying... (L: load)";
     statusColor = SKYBLUE;
   } else if (hasHintResult) {
     switch (lastHintResult) {
@@ -127,13 +131,13 @@ void DrawUI(void) {
   }
 }
 
-void DrawMinesweeperGrid(void) {
+void DrawMinesweeperGrid(const Game *game) {
   for (int i = 0; i < ROWS; i++) {
     for (int j = 0; j < COLUMNS; j++) {
       int x = j * CELL_SIZE;
       int y = i * CELL_SIZE;
 
-      Cell cell = grid[i][j];
+      Cell cell = game->grid[i][j];
 
       Color fill;
       if (cell.flagged) {
@@ -160,6 +164,6 @@ void DrawMinesweeperGrid(void) {
       }
     }
   }
-  DrawHintHighlight();
-  DrawUI();
+  DrawHintHighlight(game);
+  DrawUI(game);
 }

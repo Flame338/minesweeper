@@ -9,11 +9,11 @@
 /*
  * Constraint-propagation solver for Minesweeper.
  *
- * It reads the revealed numbered cells already on the board (the global `grid`)
- * and deduces two kinds of cells:
+ * It reads the revealed numbered cells of a Board — the `grid` passed in by
+ * the caller (a Game's grid) — and deduces two kinds of cells:
  *
- *   - a SAFE cell: hidden, unflagged, and guaranteed not to be a mine under any
- *     mine placement consistent with the revealed numbers;
+ *   - a SAFE cell: hidden, unflagged, and guaranteed not to be a mine under
+ *     any mine placement consistent with the revealed numbers;
  *   - a MINE cell: hidden, unflagged, and guaranteed to be a mine.
  *
  * Assumptions and scope:
@@ -25,26 +25,26 @@
  *     with two adjacent flags) is INCONSISTENT; the solver reports it and
  *     withholds hints rather than producing confidently wrong ones.
  *
+ * One entry point, one pass: SolverAnalyse runs the deduction once and
+ * returns consistency plus both deduced sets (see ADR-0003). Callers never
+ * re-run the engine per query, and they can't misread partial deductions:
+ * when the board is inconsistent the safe/mine lists are empty.
+ *
  * All flattened cell indices are row*COLUMNS+col.
  */
 
-// False if any revealed number contradicts the current flags (a hint would be
-// unreliable). Otherwise true.
-bool SolverIsConsistent(void);
+// Result of a single full analysis of a board.
+typedef struct {
+  bool consistent; // false: flags contradict a revealed number; lists empty
+  int safeCount;   // number of entries in safe[]
+  int safe[ROWS * COLUMNS];
+  int mineCount;   // number of entries in mine[]
+  int mine[ROWS * COLUMNS];
+} SolverResult;
 
-// Writes flattened indices of cells guaranteed NOT to be mines into out[].
-// Returns the count. out is never modified if it is NULL (just count the safe
-// cells that exist).
-int SolverSafeCells(int out[ROWS * COLUMNS]);
-
-// Writes flattened indices of cells guaranteed to be mines into out[].
-// Returns the count. Only newly-deduced, unflagged cells are reported (already
-// flagged cells are treated as the assumption, not a deduction).
-int SolverMines(int out[ROWS * COLUMNS]);
-
-// If a guaranteed-safe cell is deducible, writes its coordinates to *row/*col
-// and returns true. Returns false if the board is inconsistent or no safe cell
-// is provable (a guess would be required).
-bool SolverHint(int *row, int *col);
+// Runs one full deduction pass over `grid` and writes the result to `out`.
+// On an inconsistent board, consistent=false and both lists are empty (the
+// partial deductions of a broken board are withheld, never reported).
+void SolverAnalyse(const Cell grid[ROWS][COLUMNS], SolverResult *out);
 
 #endif /* !SOLVER_H */

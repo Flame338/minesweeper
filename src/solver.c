@@ -27,7 +27,7 @@ static bool decidedSafe[ROWS * COLUMNS];
 static bool consistent = true;
 
 /* Build the constraint list from every revealed numbered (non-mine) cell. */
-static void collect_constraints(void) {
+static void collect_constraints(const Cell grid[ROWS][COLUMNS]) {
   constraintCount = 0;
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLUMNS; c++) {
@@ -64,7 +64,9 @@ static void collect_constraints(void) {
  * A leftover negative remaining (after the caller compares it against the
  * unknown set) means the flags contradict this number.
  */
-static int unknown_and_remaining(const Constraint *con, int unknown[MAX_NEIGHBOURS],
+static int unknown_and_remaining(const Constraint *con,
+                                 const Cell grid[ROWS][COLUMNS],
+                                 int unknown[MAX_NEIGHBOURS],
                                  int *remainingOut) {
   int n = 0;
   int remaining = con->mines;
@@ -108,8 +110,8 @@ static int contains(const int *arr, int n, int idx) {
 }
 
 /* Run constraint propagation to a fixed point; rebuilds all deduction state. */
-static void propagate(void) {
-  collect_constraints();
+static void propagate(const Cell grid[ROWS][COLUMNS]) {
+  collect_constraints(grid);
 
   for (int i = 0; i < ROWS * COLUMNS; i++) {
     decidedMine[i] = false;
@@ -131,7 +133,7 @@ static void propagate(void) {
     for (int a = 0; a < constraintCount; a++) {
       int unA[MAX_NEIGHBOURS];
       int remA;
-      int nA = unknown_and_remaining(&constraints[a], unA, &remA);
+      int nA = unknown_and_remaining(&constraints[a], grid, unA, &remA);
 
       if (remA < 0 || remA > nA || (nA == 0 && remA != 0)) {
         consistent = false;
@@ -162,7 +164,7 @@ static void propagate(void) {
           continue;
         int unB[MAX_NEIGHBOURS];
         int remB;
-        int nB = unknown_and_remaining(&constraints[b], unB, &remB);
+        int nB = unknown_and_remaining(&constraints[b], grid, unB, &remB);
 
         if (remB < 0 || remB > nB || (nB == 0 && remB != 0)) {
           consistent = false;
@@ -198,47 +200,29 @@ static void propagate(void) {
   }
 }
 
-bool SolverIsConsistent(void) {
-  propagate();
-  return consistent;
-}
+void SolverAnalyse(const Cell grid[ROWS][COLUMNS], SolverResult *out) {
+  propagate(grid);
 
-int SolverSafeCells(int out[ROWS * COLUMNS]) {
-  propagate();
-  int count = 0;
+  if (!consistent) {
+    /* Withhold the partial deductions of a broken board: an inconsistent
+     * board's safe/mine sets are not trustworthy, so report none (solver.h). */
+    out->consistent = false;
+    out->safeCount = 0;
+    out->mineCount = 0;
+    return;
+  }
+
+  out->consistent = true;
+  out->safeCount = 0;
+  out->mineCount = 0;
   for (int i = 0; i < ROWS * COLUMNS; i++) {
     if (decidedSafe[i]) {
-      if (out != NULL)
-        out[count] = i;
-      count++;
+      out->safe[out->safeCount++] = i;
     }
-  }
-  return count;
-}
-
-int SolverMines(int out[ROWS * COLUMNS]) {
-  propagate();
-  int count = 0;
-  for (int i = 0; i < ROWS * COLUMNS; i++) {
+    /* Newly-deduced mines only: already-flagged cells are the assumption,
+     * not a deduction (matches the old SolverMines semantics). */
     if (decidedMine[i] && !grid[i / COLUMNS][i % COLUMNS].flagged) {
-      if (out != NULL)
-        out[count] = i;
-      count++;
+      out->mine[out->mineCount++] = i;
     }
   }
-  return count;
-}
-
-bool SolverHint(int *row, int *col) {
-  propagate();
-  if (!consistent)
-    return false;
-  for (int i = 0; i < ROWS * COLUMNS; i++) {
-    if (decidedSafe[i]) {
-      *row = i / COLUMNS;
-      *col = i % COLUMNS;
-      return true;
-    }
-  }
-  return false;
 }

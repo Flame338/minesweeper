@@ -10,6 +10,13 @@ raylib-free so the rules can be tested and scripted headlessly.
 **Board**:
 The fixed 9×9 arrangement of Cells. One board per game.
 
+**Game**:
+The unit of play that owns a session's mutable state: the Board, the Win/Lose
+outcome, the Seed and its RNG, the Hint budget and suggestion, and the Replay
+logs. In code it is the single `Game` struct, passed explicitly across every
+module seam — no other module holds per-game state.
+_Avoid_: session, match
+
 **Cell**:
 A single square on the board. It has three independent facts: whether it is
 revealed, whether it is flagged, and whether it holds a Mine.
@@ -68,7 +75,10 @@ happened. Replays store intent (which Cell was touched), never raw input.
 _Avoid_: action, move
 
 **Save replay**:
-Persisting a game's Seed, First-click Cell, and Replay log to disk.
+Persisting a game's Seed, First-click Cell, and Replay log to disk. Only a
+live game is savable — one whose log, Seed and First-click describe the same
+game, with at least one recorded move. A loaded replay context is never
+savable: its live log is empty, so saving would produce a meaningless file.
 _Avoid_: export, record
 
 **Load replay (playback)**:

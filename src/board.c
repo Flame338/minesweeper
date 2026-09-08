@@ -1,33 +1,58 @@
 #include "../include/board.h"
 
 #include <stdbool.h>
-#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "../include/config.h"
 #include "../include/replay.h"
 #include "../include/solver.h"
 
-Cell grid[ROWS][COLUMNS];
-bool gameOver = false;
-bool won = false;
-int BOMBS = 10;
-int revealCount = 0;
-bool firstClick = false;
-int firstClickRow = -1;
-int firstClickCol = -1;
+/*
+ * The one reset in the codebase. Every way of starting a game — GameNew,
+ * GameNewWithSeed, GameReset, GameStartReplayPlayback — funnels through here,
+ * so a new Game field can never be forgotten at one reset site.
+ *
+ * Requires `game` to be zero-initialized (a fresh `Game game = {0}`) or to
+ * hold a previously reset Game (logs freed below, then everything rebuilt).
+ */
+static void reset_game(Game *game) {
+  ReplayLogFree(&game->log);
+  ReplayLogFree(&game->playback);
 
-int hintsRemaining = HINT_BUDGET;
-bool hasHint = false;
-int hintRow = -1;
-int hintCol = -1;
+  memset(game, 0, sizeof *game);
 
-u64 currentSeed = 0;
-pcg32_random rng;
+  game->bombCount = DEFAULT_BOMBS;
+  game->firstClickRow = game->firstClickCol = -1;
+  game->hintRow = game->hintCol = -1;
+  game->hintsRemaining = HINT_BUDGET;
 
-bool CheckWin(void) { return revealCount == (ROWS * COLUMNS - BOMBS); }
+  ReplayLogInit(&game->log);
+  ReplayLogInit(&game->playback);
 
-void ComputeNeighbourCounts(void) {
+  /* Defined RNG state even before any Seed is rolled. */
+  pcg32_srandom_r(&game->rng, 0, 1);
+}
+
+bool GameCheckWin(const Game *game) {
+  return game->revealCount == (ROWS * COLUMNS - game->bombCount);
+}
+
+bool GameCanReveal(const Game *game) {
+  /* Live play only: playback drives the board itself, and a finished game
+   * (won or lost) takes no more clicks. */
+  return !game->isReplaying && !game->gameOver && !game->won;
+}
+
+bool GameCanHint(const Game *game) {
+  return !game->isReplaying && !game->gameOver && !game->won;
+}
+
+bool GameCanSave(const Game *game) {
+  return !game->isReplaying && game->firstClick && game->log.count > 0;
+}
+
+void GameComputeNeighbourCounts(Game *game) {
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLUMNS; c++) {
       int count = 0;
@@ -37,20 +62,22 @@ void ComputeNeighbourCounts(void) {
             continue;
           int nr = r + dr, nc = c + dc;
           if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLUMNS) {
-            count += grid[nr][nc].hasMines;
+            count += game->grid[nr][nc].hasMines;
           }
         }
-        grid[r][c].neighbourMines = count;
       }
+      game->grid[r][c].neighbourMines = count;
     }
   }
 }
 
-void FisherYatesShuffle(int safeRow, int safeCol) {
+void GamePlantMines(Game *game, int safeRow, int safeCol) {
   int n = ROWS * COLUMNS;
   int safeIndex = safeRow * COLUMNS + safeCol;
 
-  int *idx = (int *)malloc((size_t)(n - 1) * sizeof(int));
+  /* ROWS/COLUMNS are compile-time, so the shuffle-index scratch has a
+   * fixed, tiny size (80 ints) — a stack array, no heap involved. */
+  int idx[ROWS * COLUMNS - 1];
   int k = 0;
   for (int i = 0; i < n; i++) {
     if (i != safeIndex)
@@ -59,60 +86,51 @@ void FisherYatesShuffle(int safeRow, int safeCol) {
 
   int remaining = n - 1;
   for (int i = 0; i < remaining; i++) {
-    int j = (int)pcg32_boundedrand_r(&rng, (u32)(i + 1));
+    int j = (int)pcg32_boundedrand_r(&game->rng, (u32)(i + 1));
     int temp = idx[i];
     idx[i] = idx[j];
     idx[j] = temp;
   }
 
-  for (int i = 0; i < BOMBS; i++) {
+  for (int i = 0; i < game->bombCount; i++) {
     int row = idx[i] / COLUMNS;
     int col = idx[i] % COLUMNS;
-    grid[row][col].hasMines = true;
+    game->grid[row][col].hasMines = true;
   }
-  free(idx);
 
-  ComputeNeighbourCounts();
+  GameComputeNeighbourCounts(game);
 }
 
-void InitGrid(void) {
-  for (int i = 0; i < ROWS; i++) {
-    for (int j = 0; j < COLUMNS; j++) {
-      grid[i][j] = (Cell){0};
-    }
-  }
-}
-
-void RevealAllMines() {
+static void reveal_all_mines(Game *game) {
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLUMNS; c++) {
-      if (grid[r][c].hasMines) {
-        grid[r][c].revealed = true;
+      if (game->grid[r][c].hasMines) {
+        game->grid[r][c].revealed = true;
       }
     }
   }
 }
 
-void floodFill(int row, int col) {
+void GameFloodFill(Game *game, int row, int col) {
   if (row < 0 || row >= ROWS || col < 0 || col >= COLUMNS)
     return;
-  if (grid[row][col].revealed)
+  if (game->grid[row][col].revealed)
     return;
-  if (grid[row][col].flagged)
+  if (game->grid[row][col].flagged)
     return;
 
-  if (grid[row][col].hasMines) {
-    grid[row][col].revealed = true;
-    RevealAllMines();
-    gameOver = true;
+  if (game->grid[row][col].hasMines) {
+    game->grid[row][col].revealed = true;
+    reveal_all_mines(game);
+    game->gameOver = true;
     return;
   }
 
-  grid[row][col].revealed = true;
-  revealCount++;
+  game->grid[row][col].revealed = true;
+  game->revealCount++;
 
   // Hit a numbered cell. Stop spreading
-  if (grid[row][col].neighbourMines > 0)
+  if (game->grid[row][col].neighbourMines > 0)
     return;
 
   // Still blank -> keep spreading to all 8 neighbours
@@ -120,59 +138,58 @@ void floodFill(int row, int col) {
     for (int dc = -1; dc <= 1; dc++) {
       if (dr == 0 && dc == 0)
         continue;
-      floodFill(row + dr, col + dc);
+      GameFloodFill(game, row + dr, col + dc);
     }
   }
 }
 
-void PerformReveal(int row, int col) {
-  if (grid[row][col].flagged)
+void GameReveal(Game *game, int row, int col) {
+  if (game->grid[row][col].flagged)
     return;
 
   /* The board is about to change, so a stale hint suggestion is no longer
    * guaranteed valid. (A click on a flagged cell bails out above and keeps the
    * hint, since nothing changed.) */
-  hasHint = false;
-  hintRow = hintCol = -1;
+  game->hasHint = false;
+  game->hintRow = game->hintCol = -1;
 
-  if (!isReplaying) {
-    if (!firstClick) {
-      firstClickRow = row;
-      firstClickCol = col;
-      FisherYatesShuffle(firstClickRow, firstClickCol);
-      firstClick = true;
+  if (!game->isReplaying) {
+    if (!game->firstClick) {
+      game->firstClickRow = row;
+      game->firstClickCol = col;
+      GamePlantMines(game, game->firstClickRow, game->firstClickCol);
+      game->firstClick = true;
     }
-    ReplayLogPush(&currentLog, EVT_REVEAL, row, col);
+    ReplayLogPush(&game->log, game->clock, EVT_REVEAL, row, col);
   }
-  floodFill(row, col);
+  GameFloodFill(game, row, col);
+
+  if (!game->gameOver && GameCheckWin(game)) {
+    game->won = true;
+  }
 }
 
-void PerformToggleFlag(int row, int col) {
-  if (grid[row][col].revealed)
+void GameToggleFlag(Game *game, int row, int col) {
+  if (game->grid[row][col].revealed)
     return;
 
   /* Board changes => clear any active hint suggestion. */
-  hasHint = false;
-  hintRow = hintCol = -1;
+  game->hasHint = false;
+  game->hintRow = game->hintCol = -1;
 
-  grid[row][col].flagged = !grid[row][col].flagged;
+  game->grid[row][col].flagged = !game->grid[row][col].flagged;
 
-  if (!isReplaying) {
-    ReplayLogPush(&currentLog, EVT_TOGGLE_FLAG, row, col);
+  if (!game->isReplaying) {
+    ReplayLogPush(&game->log, game->clock, EVT_TOGGLE_FLAG, row, col);
   }
 }
 
-/*
- * True if any revealed non-mine cell carries a Neighbour count > 0 - i.e.
- * there is at least one Constraint to reason from. This is the difference
- * between "no information yet" (HINT_NO_INFO) and "info exists but nothing is
- * provable" (HINT_STUCK).
- */
-static bool has_revealed_number(void) {
+
+static bool has_revealed_number(const Game *game) {
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLUMNS; c++) {
-      if (grid[r][c].revealed && !grid[r][c].hasMines &&
-          grid[r][c].neighbourMines > 0) {
+      if (game->grid[r][c].revealed && !game->grid[r][c].hasMines &&
+          game->grid[r][c].neighbourMines > 0) {
         return true;
       }
     }
@@ -180,68 +197,58 @@ static bool has_revealed_number(void) {
   return false;
 }
 
-HintResult RequestHint(int *row, int *col) {
-  if (hintsRemaining <= 0)
+HintResult GameHint(Game *game, int *row, int *col) {
+  if (game->hintsRemaining <= 0)
     return HINT_EXHAUSTED;
 
-  if (!SolverIsConsistent())
-    return HINT_INCONSISTENT;
+  SolverResult r;
+  SolverAnalyse(game->grid, &r);
 
-  int r, c;
-  if (!SolverHint(&r, &c)) {
-    return has_revealed_number() ? HINT_STUCK : HINT_NO_INFO;
-  }
+  if (!r.consistent)
+    return HINT_INCONSISTENT;
+  if (r.safeCount == 0)
+    return has_revealed_number(game) ? HINT_STUCK : HINT_NO_INFO;
+
+  int r2 = r.safe[0] / COLUMNS;
+  int c = r.safe[0] % COLUMNS;
 
   /* Re-requesting the same, still-active hint (nothing changed) costs nothing:
    * the board is unchanged so the suggestion is still exactly right. */
-  if (hasHint && hintRow == r && hintCol == c) {
+  if (game->hasHint && game->hintRow == r2 && game->hintCol == c) {
     if (row) {
-      *row = r;
+      *row = r2;
       *col = c;
     }
     return HINT_OK;
   }
 
-  hintsRemaining--;
-  hasHint = true;
-  hintRow = r;
-  hintCol = c;
+  game->hintsRemaining--;
+  game->hasHint = true;
+  game->hintRow = r2;
+  game->hintCol = c;
   if (row) {
-    *row = r;
+    *row = r2;
     *col = c;
   }
   return HINT_OK;
 }
 
-// Resets the board and replay log, then rolls a fresh random seed.
-void NewGame(void) {
-  // Combining wall-clock & CPU clock so that two games started at the same
-  // second still gets different seeds
-  NewGameWithSeed(((u64)time(NULL) << 32) ^ (u64)clock());
+
+void GameNewWithSeed(Game *game, u64 seed) {
+  reset_game(game);
+  game->seed = seed;
+  pcg32_srandom_r(&game->rng, seed, 1);
 }
 
-// Same as NewGame() but with an explicit seed. Exposes the seed as a seam so
-// tests and the headless tool can build a fully deterministic board (and thus
-// a fully deterministic replay).
-void NewGameWithSeed(u64 seed) {
-  InitGrid();
-  gameOver = false;
-  won = false;
-  revealCount = 0;
-  firstClick = false;
-  firstClickRow = -1;
-  firstClickCol = -1;
-  isReplaying = false;
-  gameClock = 0.0f;
+// Rolls a fresh random seed. Combining wall-clock & CPU clock so that two
+// games started at the same second still get different seeds.
+void GameNew(Game *game) {
+  GameNewWithSeed(game, ((u64)time(NULL) << 32) ^ (u64)clock());
+}
 
-  /* A fresh game restores the full hint budget and clears any suggestion. */
-  hintsRemaining = HINT_BUDGET;
-  hasHint = false;
-  hintRow = hintCol = -1;
+void GameReset(Game *game) { reset_game(game); }
 
-  ReplayLogFree(&currentLog);
-  ReplayLogInit(&currentLog);
-
-  currentSeed = seed;
-  pcg32_srandom_r(&rng, currentSeed, 1);
+void GameFree(Game *game) {
+  ReplayLogFree(&game->log);
+  ReplayLogFree(&game->playback);
 }

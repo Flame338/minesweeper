@@ -24,11 +24,17 @@ extern void test_floodfill_expands_and_stops_at_numbers(void);
 extern void test_reveal_mine_loses(void);
 extern void test_flag_toggle(void);
 extern void test_checkwin(void);
+extern void test_reveal_seam_sets_won(void);
+extern void test_reveal_seam_loses_does_not_win(void);
+extern void test_can_reveal_hint_live_only(void);
+extern void test_can_hint_ignores_budget(void);
+extern void test_can_save_requires_live_log(void);
 
 /* replay edge cases */
 extern void test_save_replay_fails_before_first_click(void);
 extern void test_load_missing_file_fails(void);
 extern void test_newgame_resets_state_after_replay(void);
+extern void test_save_refused_during_and_after_playback(void);
 
 /* round trip */
 extern void test_replay_roundtrip(void);
@@ -70,10 +76,17 @@ int main(void) {
       {"reveal mine loses", test_reveal_mine_loses},
       {"flag toggle", test_flag_toggle},
       {"checkwin", test_checkwin},
+      {"reveal seam sets won", test_reveal_seam_sets_won},
+      {"reveal seam lose does not win", test_reveal_seam_loses_does_not_win},
+      {"can reveal/hint live only", test_can_reveal_hint_live_only},
+      {"can hint ignores budget", test_can_hint_ignores_budget},
+      {"can save requires live log", test_can_save_requires_live_log},
       {"save replay fails before first click",
        test_save_replay_fails_before_first_click},
       {"load missing file fails", test_load_missing_file_fails},
       {"newgame resets state after replay", test_newgame_resets_state_after_replay},
+      {"save refused during/after playback",
+       test_save_refused_during_and_after_playback},
       {"replay round trip", test_replay_roundtrip},
       {"replay stops at hit mine", test_replay_stops_at_hit_mine},
       {"solver rule1 zero-remaining safe", test_rule1_zero_remaining_safe},

@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "pcg32.h"
+#include "replay.h"
 
 typedef struct {
   bool revealed;
@@ -27,58 +28,77 @@ typedef enum {
   HINT_NO_INFO,         /* nothing revealed yet to reason from */
 } HintResult;
 
-extern Cell grid[ROWS][COLUMNS];
-extern bool gameOver;
-extern bool won;
-extern int BOMBS;
-extern int revealCount;
+typedef struct Game {
+  Cell grid[ROWS][COLUMNS]; 
 
-// Hints remaining this game. Starts at HINT_BUDGET; reset on a new game and on
-// a replay load. Spent only when RequestHint actually produces a new hint.
-extern int hintsRemaining;
+  bool gameOver;  
+  bool won;       
+  int bombCount;  
+  int revealCount;
 
-// The currently highlighted hint cell (the safety suggestion). Cleared whenever
-// the board changes so a stale suggestion is never shown. Has no meaning when
-// hasHint is false.
-extern bool hasHint;
-extern int hintRow;
-extern int hintCol;
+  bool firstClick; 
+  int firstClickRow;
+  int firstClickCol;
 
-// The board is only randomized once, on the first reveal of a game
-// These records when/where that happened so a replay can reproduce it exactly
-extern bool firstClick;
-extern int firstClickRow;
-extern int firstClickCol;
+  u64 seed;          
+  pcg32_random rng;  
 
-// The seed for the current game's mine layout, and the PCG32 state it
-// drives. Exposed so the replay system can save/restore these
-extern u64 currentSeed;
-extern pcg32_random rng;
+  /* Hints remaining this game. Starts at HINT_BUDGET; reset on a new game
+   * and on a replay load. Spent only when GameHint actually produces a new
+   * hint. */
+  int hintsRemaining;
 
-void InitGrid(void);
-void ComputeNeighbourCounts(void);
-void FisherYatesShuffle(int safeRow, int safeCol);
-void RevealAllMines(void);
-void floodFill(int row, int col);
-bool CheckWin(void);
+  /* The currently highlighted hint cell (the safety suggestion). Cleared
+   * whenever the board changes so a stale suggestion is never shown. Has no
+   * meaning when hasHint is false. */
+  bool hasHint;
+  int hintRow;
+  int hintCol;
 
-// Starts a brand new game: resets the board, clears the replay log, and
-// rolls a fresh seed.
-void NewGame(void);
+  ReplayLog log;      
+  ReplayLog playback; 
+  bool isReplaying;   
+  int playbackIndex;  
+  f32 clock;          
+} Game;
 
-// Like NewGame(), but with an explicit seed. Deterministic boards — the tests
-// and the headless tool use this; start replay with NewGameWithSeed if you
-// want the same layout twice.
-void NewGameWithSeed(u64 seed);
+void GameNew(Game *game);
+void GameNewWithSeed(Game *game, u64 seed);
+void GameReset(Game *game);
+void GameFree(Game *game); /* releases the Replay logs */
 
-void PerformReveal(int row, int col);
-void PerformToggleFlag(int row, int col);
+/* Player moves. These are the one seam live input, replay playback and the
+ * tests all cross (see ADR-0001). The seam owns the outcome: GameReveal sets
+ * won when the last safe Cell is revealed, and Lose (gameOver) when a Mine is
+ * revealed — drivers never re-derive Win/Lose themselves (see ADR-0003). */
+void GameReveal(Game *game, int row, int col);
+void GameToggleFlag(Game *game, int row, int col);
 
-// Requests a guaranteed-safe hint. Spends the budget only when a *new* hint is
-// produced (re-showing the still-active hint costs nothing). On HINT_OK writes
-// the cell to *row/*col if they are non-NULL. No gating here for replay/game
-// over/win — the input layer decides whether the request is legal - so this
-// stays a pure, testable board operation.
-HintResult RequestHint(int *row, int *col);
+// True when every non-Mine Cell has been Revealed.
+bool GameCheckWin(const Game *game);
+
+/* Legality queries (ADR-0003): the Game module owns "what may happen now",
+ * so drivers ask instead of re-deriving phase from the raw bools. */
+bool GameCanReveal(const Game *game);
+bool GameCanHint(const Game *game);
+bool GameCanSave(const Game *game);
+
+// Requests a guaranteed-safe hint. Spends the budget only when a *new* hint
+// is produced (re-showing the still-active hint costs nothing). On HINT_OK
+// writes the cell to *row/*col if they are non-NULL. No gating here for
+// replay/game over/win — the input layer decides whether the request is
+// legal - so this stays a pure, testable board operation.
+HintResult GameHint(Game *game, int *row, int *col);
+
+/* Board mechanics. Kept public so the replay loader and the tests can build
+ * arbitrary board states; production code reaches them through the moves
+ * above. */
+void GameComputeNeighbourCounts(Game *game);
+void GameFloodFill(Game *game, int row, int col);
+
+// Plants `bombCount` Mines on a fresh Board, excluding (safeRow, safeCol)
+// (the First click), then computes Neighbour counts. Fisher-Yates on
+// game->rng, so the layout is deterministic given Seed + First click.
+void GamePlantMines(Game *game, int safeRow, int safeCol);
 
 #endif // !BOARD_H
