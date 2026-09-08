@@ -4,14 +4,45 @@
 #include "../include/replay.h"
 
 #include <raylib.h>
+#include <math.h>
 #include <stddef.h>
 
 static Color numberColors[9] = {BLANK,  BLUE,       DARKGREEN, RED, DARKBLUE,
                                 MAROON, DARKPURPLE, BLANK,     GRAY};
-Rectangle newGameButton = {.x = (WINDOW_WIDTH - BTN_WIDTH) / 2.0f,
-                           .y = ROWS * CELL_SIZE + 15,
+
+/* Two side-by-side buttons in the panel: New Game (left) and Hint (right).
+ * 2*BTN_WIDTH + 20 gap = 300 px, centered in the 360 px window. */
+Rectangle newGameButton = {.x = 30.0f,
+                           .y = ROWS * CELL_SIZE + 15.0f,
                            .width = BTN_WIDTH,
                            .height = BTN_HEIGHT};
+Rectangle hintButton = {.x = 30.0f + BTN_WIDTH + 20.0f,
+                        .y = ROWS * CELL_SIZE + 15.0f,
+                        .width = BTN_WIDTH,
+                        .height = BTN_HEIGHT};
+
+/* Most recent hint-request outcome, shown as a transient status message. */
+HintResult lastHintResult = HINT_OK;
+bool hasHintResult = false;
+
+/* True when the Hint control is usable: live play, not over, budget left. */
+static bool hint_enabled(void) {
+  return !isReplaying && !gameOver && !won && hintsRemaining > 0;
+}
+
+/* Pulsing gold outline around the suggested safe cell. */
+static void DrawHintHighlight(void) {
+  if (!hasHint)
+    return;
+  if (hintRow < 0 || hintRow >= ROWS || hintCol < 0 || hintCol >= COLUMNS)
+    return;
+
+  float t = sinf(gameClock * 5.0f) * 0.5f + 0.5f; // 0..1
+  unsigned char alpha = (unsigned char)(150 + (int)(100.0f * t));
+  Color c = (Color){255, 215, 0, alpha}; // gold
+  Rectangle r = {hintCol * CELL_SIZE, hintRow * CELL_SIZE, CELL_SIZE, CELL_SIZE};
+  DrawRectangleLinesEx(r, 3.0f, c);
+}
 
 void DrawUI(void) {
   int panelY = ROWS * CELL_SIZE;
@@ -20,16 +51,35 @@ void DrawUI(void) {
                 (Color){40, 44, 52, 255});
 
   Vector2 mouse = GetMousePosition();
-  bool hovered = CheckCollisionPointRec(mouse, newGameButton);
-  Color btnColor =
-      hovered ? (Color){90, 200, 250, 255} : (Color){70, 130, 180, 255};
 
-  DrawRectangleRounded(newGameButton, 0.3f, 8, btnColor);
-  const char *label = "New Game";
-  int labelWidth = MeasureText(label, 18);
-  DrawText(label, newGameButton.x + (newGameButton.width - labelWidth) / 2,
+  /* New Game button. */
+  bool newHovered = CheckCollisionPointRec(mouse, newGameButton);
+  Color newColor =
+      newHovered ? (Color){90, 200, 250, 255} : (Color){70, 130, 180, 255};
+  DrawRectangleRounded(newGameButton, 0.3f, 8, newColor);
+  const char *newLabel = "New Game";
+  int newLabelWidth = MeasureText(newLabel, 18);
+  DrawText(newLabel, newGameButton.x + (newGameButton.width - newLabelWidth) / 2,
            newGameButton.y + (newGameButton.height - 18) / 2, 18, RAYWHITE);
 
+  /* Hint button - shows the budget in the label; greys out when unavailable. */
+  bool enabled = hint_enabled();
+  bool hintHovered = CheckCollisionPointRec(mouse, hintButton);
+  Color hintColor;
+  if (!enabled) {
+    hintColor = (Color){55, 55, 65, 255};
+  } else {
+    hintColor =
+        hintHovered ? (Color){90, 200, 250, 255} : (Color){70, 130, 180, 255};
+  }
+  DrawRectangleRounded(hintButton, 0.3f, 8, hintColor);
+  const char *hintLabel = TextFormat("Hint (%d/%d)", hintsRemaining, HINT_BUDGET);
+  int hintLabelWidth = MeasureText(hintLabel, 18);
+  Color hintText = enabled ? RAYWHITE : (Color){140, 140, 150, 255};
+  DrawText(hintLabel, hintButton.x + (hintButton.width - hintLabelWidth) / 2,
+           hintButton.y + (hintButton.height - 18) / 2, 18, hintText);
+
+  /* Status/message line (centered on the panel, below the buttons). */
   const char *status = NULL;
   Color statusColor = RAYWHITE;
   if (won) {
@@ -41,6 +91,33 @@ void DrawUI(void) {
   } else if (isReplaying) {
     status = "Replaying... (S: save, L: load)";
     statusColor = SKYBLUE;
+  } else if (hasHintResult) {
+    switch (lastHintResult) {
+      case HINT_EXHAUSTED: {
+        status = "No hints remaining";
+        statusColor = GRAY;
+        break;
+      }
+      case HINT_INCONSISTENT: {
+        status = "Board is inconsistent - hints withheld";
+        statusColor = ORANGE;
+        break;
+      }
+      case HINT_STUCK: {
+        status = "No guaranteed-safe hint available";
+        statusColor = GRAY;
+        break;
+      }
+      case HINT_NO_INFO: {
+        status = "Reveal a cell first";
+        statusColor = GRAY;
+        break;
+      }
+      default: {
+        status = NULL;
+        break;
+      }
+    }
   }
 
   if (status != NULL) {
@@ -83,5 +160,6 @@ void DrawMinesweeperGrid(void) {
       }
     }
   }
+  DrawHintHighlight();
   DrawUI();
 }

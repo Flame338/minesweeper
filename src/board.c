@@ -6,6 +6,7 @@
 
 #include "../include/config.h"
 #include "../include/replay.h"
+#include "../include/solver.h"
 
 Cell grid[ROWS][COLUMNS];
 bool gameOver = false;
@@ -15,6 +16,11 @@ int revealCount = 0;
 bool firstClick = false;
 int firstClickRow = -1;
 int firstClickCol = -1;
+
+int hintsRemaining = HINT_BUDGET;
+bool hasHint = false;
+int hintRow = -1;
+int hintCol = -1;
 
 u64 currentSeed = 0;
 pcg32_random rng;
@@ -123,6 +129,12 @@ void PerformReveal(int row, int col) {
   if (grid[row][col].flagged)
     return;
 
+  /* The board is about to change, so a stale hint suggestion is no longer
+   * guaranteed valid. (A click on a flagged cell bails out above and keeps the
+   * hint, since nothing changed.) */
+  hasHint = false;
+  hintRow = hintCol = -1;
+
   if (!isReplaying) {
     if (!firstClick) {
       firstClickRow = row;
@@ -139,11 +151,66 @@ void PerformToggleFlag(int row, int col) {
   if (grid[row][col].revealed)
     return;
 
+  /* Board changes => clear any active hint suggestion. */
+  hasHint = false;
+  hintRow = hintCol = -1;
+
   grid[row][col].flagged = !grid[row][col].flagged;
 
   if (!isReplaying) {
     ReplayLogPush(&currentLog, EVT_TOGGLE_FLAG, row, col);
   }
+}
+
+/*
+ * True if any revealed non-mine cell carries a Neighbour count > 0 - i.e.
+ * there is at least one Constraint to reason from. This is the difference
+ * between "no information yet" (HINT_NO_INFO) and "info exists but nothing is
+ * provable" (HINT_STUCK).
+ */
+static bool has_revealed_number(void) {
+  for (int r = 0; r < ROWS; r++) {
+    for (int c = 0; c < COLUMNS; c++) {
+      if (grid[r][c].revealed && !grid[r][c].hasMines &&
+          grid[r][c].neighbourMines > 0) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+HintResult RequestHint(int *row, int *col) {
+  if (hintsRemaining <= 0)
+    return HINT_EXHAUSTED;
+
+  if (!SolverIsConsistent())
+    return HINT_INCONSISTENT;
+
+  int r, c;
+  if (!SolverHint(&r, &c)) {
+    return has_revealed_number() ? HINT_STUCK : HINT_NO_INFO;
+  }
+
+  /* Re-requesting the same, still-active hint (nothing changed) costs nothing:
+   * the board is unchanged so the suggestion is still exactly right. */
+  if (hasHint && hintRow == r && hintCol == c) {
+    if (row) {
+      *row = r;
+      *col = c;
+    }
+    return HINT_OK;
+  }
+
+  hintsRemaining--;
+  hasHint = true;
+  hintRow = r;
+  hintCol = c;
+  if (row) {
+    *row = r;
+    *col = c;
+  }
+  return HINT_OK;
 }
 
 // Resets the board and replay log, then rolls a fresh random seed.
@@ -166,6 +233,11 @@ void NewGameWithSeed(u64 seed) {
   firstClickCol = -1;
   isReplaying = false;
   gameClock = 0.0f;
+
+  /* A fresh game restores the full hint budget and clears any suggestion. */
+  hintsRemaining = HINT_BUDGET;
+  hasHint = false;
+  hintRow = hintCol = -1;
 
   ReplayLogFree(&currentLog);
   ReplayLogInit(&currentLog);

@@ -40,6 +40,14 @@ extern void test_rule2_unknown_is_all_mines(void);
 extern void test_subset_rule_extra_cells_safe(void);
 extern void test_hint_false_when_nothing_guaranteed(void);
 extern void test_inconsistent_overflagged(void);
+extern void test_hint_budget_starts_full(void);
+extern void test_hint_no_info_consumes_nothing(void);
+extern void test_hint_success_consumes_one(void);
+extern void test_hint_same_cell_reshow_free(void);
+extern void test_hint_inconsistent_consumes_nothing(void);
+extern void test_hint_exhausted(void);
+extern void test_hint_budget_reset_on_newgame(void);
+extern void test_hint_clears_on_mutation(void);
 
 typedef void (*TestFn)(void);
 typedef struct {
@@ -74,6 +82,14 @@ int main(void) {
       {"solver hint false when nothing guaranteed",
        test_hint_false_when_nothing_guaranteed},
       {"solver inconsistent over-flagged", test_inconsistent_overflagged},
+      {"hint budget starts full", test_hint_budget_starts_full},
+      {"hint no-info costs nothing", test_hint_no_info_consumes_nothing},
+      {"hint success costs one", test_hint_success_consumes_one},
+      {"hint same-cell re-show is free", test_hint_same_cell_reshow_free},
+      {"hint inconsistent costs nothing", test_hint_inconsistent_consumes_nothing},
+      {"hint exhausted", test_hint_exhausted},
+      {"hint budget resets on new game", test_hint_budget_reset_on_newgame},
+      {"hint clears on mutation", test_hint_clears_on_mutation},
   };
 
   size_t n = sizeof(tests) / sizeof(tests[0]);

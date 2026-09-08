@@ -120,3 +120,125 @@ void test_inconsistent_overflagged(void) {
   int row, col;
   CHECK(SolverHint(&row, &col) == false);
 }
+
+/* -------------------------------------------------------------------------
+ * Hint-budget / RequestHint tests (board.c).
+ *
+ * These check the budget-accounting contract: a hint is spent only when a new
+ * guaranteed-safe cell is produced; no-info, inconsistent and same-cell
+ * re-shows cost nothing; and a new game restores the budget.
+ * ------------------------------------------------------------------------- */
+
+void test_hint_budget_starts_full(void) {
+  clean_board();
+  CHECK(hintsRemaining == HINT_BUDGET);
+  CHECK(hasHint == false);
+  CHECK(hintRow == -1 && hintCol == -1);
+}
+
+void test_hint_no_info_consumes_nothing(void) {
+  clean_board();
+  int r, c;
+  CHECK(RequestHint(&r, &c) == HINT_NO_INFO);
+  CHECK(hintsRemaining == HINT_BUDGET);
+  CHECK(hasHint == false);
+}
+
+/* A provable safe cell is produced; the budget drops by one and the hint cell
+ * is recorded. */
+void test_hint_success_consumes_one(void) {
+  clean_board();
+  set_mine(0, 1);
+  set_mine(1, 0);
+  ComputeNeighbourCounts();
+  set_revealed(0, 0); /* count == 2 */
+  set_flag(0, 1);     /* the two mines, flagged => (1,1) is provably safe */
+  set_flag(1, 0);
+  int r, c;
+  CHECK(RequestHint(&r, &c) == HINT_OK);
+  CHECK(r == 1 && c == 1);
+  CHECK(hintsRemaining == HINT_BUDGET - 1);
+  CHECK(hasHint == true);
+  CHECK(hintRow == 1 && hintCol == 1);
+}
+
+/* Re-requesting the same still-active hint (board unchanged) is free. */
+void test_hint_same_cell_reshow_free(void) {
+  clean_board();
+  set_mine(0, 1);
+  set_mine(1, 0);
+  ComputeNeighbourCounts();
+  set_revealed(0, 0); /* count == 2 */
+  set_flag(0, 1);     /* the two mines, flagged => (1,1) is provably safe */
+  set_flag(1, 0);
+  int r, c;
+  CHECK(RequestHint(&r, &c) == HINT_OK);
+  CHECK(hintsRemaining == HINT_BUDGET - 1);
+
+  CHECK(RequestHint(&r, &c) == HINT_OK);
+  CHECK(r == 1 && c == 1);
+  CHECK(hintsRemaining == HINT_BUDGET - 1); /* unchanged */
+  CHECK(hasHint == true);
+}
+
+/* An inconsistent board withholds the hint and spends nothing. */
+void test_hint_inconsistent_consumes_nothing(void) {
+  clean_board();
+  set_mine(0, 1);
+  ComputeNeighbourCounts();
+  set_revealed(0, 0); /* count == 1 */
+  set_flag(0, 1);     /* the one mine */
+  set_flag(1, 0);     /* extra flag > remaining == -1 */
+  CHECK(SolverIsConsistent() == false);
+  int r, c;
+  CHECK(RequestHint(&r, &c) == HINT_INCONSISTENT);
+  CHECK(hintsRemaining == HINT_BUDGET);
+  CHECK(hasHint == false);
+}
+
+/* Zero budget => exhausted, and no new hint is recorded. */
+void test_hint_exhausted(void) {
+  clean_board();
+  hintsRemaining = 0;
+  int r, c;
+  CHECK(RequestHint(&r, &c) == HINT_EXHAUSTED);
+  CHECK(hintsRemaining == 0);
+  CHECK(hasHint == false);
+}
+
+/* A new game restores the full budget and clears the suggestion. */
+void test_hint_budget_reset_on_newgame(void) {
+  clean_board();
+  set_mine(0, 1);
+  set_mine(1, 0);
+  ComputeNeighbourCounts();
+  set_revealed(0, 0); /* count == 2 */
+  set_flag(0, 1);     /* the two mines, flagged => (1,1) is provably safe */
+  set_flag(1, 0);
+  CHECK(RequestHint(NULL, NULL) == HINT_OK);
+  CHECK(hintsRemaining == HINT_BUDGET - 1);
+  CHECK(hasHint == true);
+
+  NewGameWithSeed(42);
+  CHECK(hintsRemaining == HINT_BUDGET);
+  CHECK(hasHint == false);
+  CHECK(hintRow == -1 && hintCol == -1);
+}
+
+/* Revealing the hinted cell (a board mutation) clears the suggestion. */
+void test_hint_clears_on_mutation(void) {
+  clean_board();
+  set_mine(0, 1);
+  set_mine(1, 0);
+  ComputeNeighbourCounts();
+  set_revealed(0, 0); /* count == 2 */
+  set_flag(0, 1);     /* the two mines, flagged => (1,1) is provably safe */
+  set_flag(1, 0);
+  int r, c;
+  CHECK(RequestHint(&r, &c) == HINT_OK);
+  CHECK(hasHint == true);
+
+  firstClick = true; /* mines already placed by hand; don't let reveal re-roll */
+  PerformReveal(hintRow, hintCol);
+  CHECK(hasHint == false);
+}

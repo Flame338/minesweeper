@@ -159,6 +159,12 @@ bool StartReplayPlayback(const char *path) {
   replayIndex = 0;
   isReplaying = true;
 
+  /* A loaded replay is a fresh board context: restore the hint budget and drop
+   * any live-play suggestion. Hints stay disabled while isReplaying. */
+  hintsRemaining = HINT_BUDGET;
+  hasHint = false;
+  hintRow = hintCol = -1;
+
   return true;
 }
 

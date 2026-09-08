@@ -37,6 +37,9 @@ static inline void clean_board(void) {
   isReplaying = false;
   BOMBS = 10;
   gameClock = 0.0f;
+  hintsRemaining = HINT_BUDGET;
+  hasHint = false;
+  hintRow = hintCol = -1;
   ReplayLogFree(&currentLog);
   ReplayLogInit(&currentLog);
   ReplayLogFree(&activeReplay);
