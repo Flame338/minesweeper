@@ -83,8 +83,16 @@ _Avoid_: AI, bot, engine
 
 **Hint**:
 A suggested Cell to Reveal next, chosen because it is safe under the current
-information. The hint is guaranteed safe, not a guess.
+information. The hint is guaranteed safe, not a guess. Requesting a Hint is a
+suggestion, not a move — it is never recorded as a Replay event.
 _Avoid_: help, tip, suggestion
+
+**Hint budget**:
+The finite per-game allowance of Hints a player may request. A Hint is consumed
+from the budget only when one is actually produced and shown; a request that
+yields no Hint (before the first Reveal, when a guess would be required, or on
+an Inconsistent board) spends nothing.
+_Avoid_: hint count, hint points
 
 **Safe cell**:
 A hidden, unflagged Cell that cannot be a Mine under any Mine placement

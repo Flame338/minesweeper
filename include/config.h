@@ -15,6 +15,10 @@
 #define BTN_WIDTH 140
 #define BTN_HEIGHT 40
 
+// How many hints a player gets per game. A hint is spent from this budget only
+// when a new guaranteed-safe cell is actually produced and shown.
+#define HINT_BUDGET 3
+
 // Single source of truth for the replay file path. The game saves and loads
 // this exact file (see input.c); keeping it in one place prevents the
 // save/load path from ever drifting apart.

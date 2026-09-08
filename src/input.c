@@ -1,6 +1,8 @@
 #include "../include/input.h"
 #include "raylib.h"
 
+#include <stddef.h>
+
 #include "../include/board.h"
 #include "../include/config.h"
 #include "../include/render.h"
@@ -12,6 +14,7 @@ void HandleInput(void) {
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
       CheckCollisionPointRec(mouse, newGameButton)) {
     NewGame();
+    hasHintResult = false; // a new game clears any pending hint message
     return;
   }
 
@@ -26,8 +29,20 @@ void HandleInput(void) {
   if (IsKeyPressed(KEY_L)) {
     if (StartReplayPlayback(REPLAY_PATH)) {
       TraceLog(LOG_INFO, "Replaying replay.msr");
+      hasHintResult = false; // a load replaces the board context
     } else {
       TraceLog(LOG_WARNING, "Failed to load replay.msr");
+    }
+  }
+
+  /* Request a hint: mouse click on the Hint button or the H key. Only legal
+   * during active live play (not replay, not after win/loss). */
+  bool hintClicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+                     CheckCollisionPointRec(mouse, hintButton);
+  if (hintClicked || IsKeyPressed(KEY_H)) {
+    if (!isReplaying && !gameOver && !won) {
+      lastHintResult = RequestHint(NULL, NULL);
+      hasHintResult = (lastHintResult != HINT_OK);
     }
   }
 
@@ -44,9 +59,11 @@ void HandleInput(void) {
 
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
     PerformReveal(row, col);
+    hasHintResult = false; // a move supersedes the transient message
   }
 
   if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
     PerformToggleFlag(row, col);
+    hasHintResult = false;
   }
 }
