@@ -33,7 +33,8 @@ TOOLS_DIR := tools
 TARGET := $(BIN_DIR)/minesweeper.exe
 
 # Headless runnables that reuse the raylib-free game logic (board/pcg32/replay)
-CORE_SRCS := $(SRC_DIR)/board.c $(SRC_DIR)/pcg32.c $(SRC_DIR)/replay.c
+CORE_SRCS := $(SRC_DIR)/board.c $(SRC_DIR)/pcg32.c $(SRC_DIR)/replay.c \
+             $(SRC_DIR)/solver.c
 TOOL_EXE  := $(BIN_DIR)/ms_tool.exe
 TEST_EXE  := $(BUILD_DIR)/test_minesweeper.exe
 
@@ -87,10 +88,12 @@ test: $(TEST_EXE)
 
 $(TEST_EXE): $(TEST_DIR)/test_runner.c $(TEST_DIR)/test_pcg32.c \
              $(TEST_DIR)/test_board.c $(TEST_DIR)/test_replay.c \
-             $(TEST_DIR)/test_roundtrip.c $(CORE_SRCS) | $(BUILD_DIR)
+             $(TEST_DIR)/test_roundtrip.c $(TEST_DIR)/test_solver.c \
+             $(CORE_SRCS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $(TEST_DIR)/test_runner.c $(TEST_DIR)/test_pcg32.c \
 	    $(TEST_DIR)/test_board.c $(TEST_DIR)/test_replay.c \
-	    $(TEST_DIR)/test_roundtrip.c $(CORE_SRCS) -lm
+	    $(TEST_DIR)/test_roundtrip.c $(TEST_DIR)/test_solver.c \
+	    $(CORE_SRCS) -lm
 	@echo "Built $(TEST_EXE)"
 
 # Remove build artifacts

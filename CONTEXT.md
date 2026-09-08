@@ -75,3 +75,38 @@ _Avoid_: export, record
 Reading a saved game, regenerating its Mine layout from the Seed, then
 Re-applying its Replay events to reconstruct the original board exactly.
 _Avoid_: import, replay file
+
+**Solver**:
+The decision engine that reads the Board and deduces information from the
+revealed numbers — which Cells are safe to Reveal and which are Mines.
+_Avoid_: AI, bot, engine
+
+**Hint**:
+A suggested Cell to Reveal next, chosen because it is safe under the current
+information. The hint is guaranteed safe, not a guess.
+_Avoid_: help, tip, suggestion
+
+**Safe cell**:
+A hidden, unflagged Cell that cannot be a Mine under any Mine placement
+consistent with the revealed numbers. Revealing it never loses the game.
+_Avoid_: safe move, free cell
+
+**Definite mine**:
+A hidden, unflagged Cell that must be a Mine under every placement consistent
+with the revealed numbers.
+_Avoid_: certain mine, guaranteed mine
+
+**Constraint**:
+A revealed numbered Cell whose Neighbour count must be satisfied by the Mines
+among its neighbouring Candidates.
+_Avoid_: clue, rule, condition
+
+**Candidate**:
+A hidden, still-unknown Cell that one or more Constraints apply to.
+_Avoid_: possible mine, spot, unknown
+
+**Inconsistency**:
+A Board state where the Flags contradict a revealed Neighbour count (e.g. two
+flags around a revealed "1"). Hints are withheld because they would be
+unreliable.
+_Avoid_: contradiction, bug state

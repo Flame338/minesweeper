@@ -34,6 +34,13 @@ extern void test_newgame_resets_state_after_replay(void);
 extern void test_replay_roundtrip(void);
 extern void test_replay_stops_at_hit_mine(void);
 
+/* solver */
+extern void test_rule1_zero_remaining_safe(void);
+extern void test_rule2_unknown_is_all_mines(void);
+extern void test_subset_rule_extra_cells_safe(void);
+extern void test_hint_false_when_nothing_guaranteed(void);
+extern void test_inconsistent_overflagged(void);
+
 typedef void (*TestFn)(void);
 typedef struct {
   const char *name;
@@ -61,6 +68,12 @@ int main(void) {
       {"newgame resets state after replay", test_newgame_resets_state_after_replay},
       {"replay round trip", test_replay_roundtrip},
       {"replay stops at hit mine", test_replay_stops_at_hit_mine},
+      {"solver rule1 zero-remaining safe", test_rule1_zero_remaining_safe},
+      {"solver rule2 unknown all mines", test_rule2_unknown_is_all_mines},
+      {"solver subset rule extra cells safe", test_subset_rule_extra_cells_safe},
+      {"solver hint false when nothing guaranteed",
+       test_hint_false_when_nothing_guaranteed},
+      {"solver inconsistent over-flagged", test_inconsistent_overflagged},
   };
 
   size_t n = sizeof(tests) / sizeof(tests[0]);
