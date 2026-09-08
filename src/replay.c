@@ -113,7 +113,10 @@ static bool LoadReplayFile(const char *path, ReplayLog *outLog,
     if (fread(outLog->events, sizeof(ReplayEvent), header.eventCount, f) !=
         header.eventCount) {
       fclose(f);
-      free(outLog->events);
+      /* Leave a valid, empty log behind: ReplayLogFree frees and resets
+       * count/capacity too, so a caller can't misread a failed load as a
+       * log that holds events. */
+      ReplayLogFree(outLog);
       return false;
     }
   }

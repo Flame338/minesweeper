@@ -1,7 +1,6 @@
 #include "../include/board.h"
 
 #include <stdbool.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -62,7 +61,9 @@ void GamePlantMines(Game *game, int safeRow, int safeCol) {
   int n = ROWS * COLUMNS;
   int safeIndex = safeRow * COLUMNS + safeCol;
 
-  int *idx = (int *)malloc((size_t)(n - 1) * sizeof(int));
+  /* ROWS/COLUMNS are compile-time, so the shuffle-index scratch has a
+   * fixed, tiny size (80 ints) — a stack array, no heap involved. */
+  int idx[ROWS * COLUMNS - 1];
   int k = 0;
   for (int i = 0; i < n; i++) {
     if (i != safeIndex)
@@ -82,7 +83,6 @@ void GamePlantMines(Game *game, int safeRow, int safeCol) {
     int col = idx[i] % COLUMNS;
     game->grid[row][col].hasMines = true;
   }
-  free(idx);
 
   GameComputeNeighbourCounts(game);
 }
