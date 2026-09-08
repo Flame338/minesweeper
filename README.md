@@ -21,8 +21,9 @@ the library file differs.
 - **Windows (MinGW-w64 / w64devkit):** `make raylib-get` then `make`
   → `bin/minesweeper.exe` (statically linked, no raylib/GCC runtime DLLs).
 - **Linux (WSL / any x86_64 Linux):** `make raylib-get` then `make`
-  → `bin/minesweeper`. Needs the X11/GL system libs (e.g. `sudo apt install
-  libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev`) to link.
+  → `bin/minesweeper`. Needs the X11/GL system libs to link (e.g. `sudo apt
+  install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+  libgl1-mesa-dev`).
 - **Cross-compile Windows from Linux:** `make raylib-get PLATFORM=win` then
   `make PLATFORM=win CC=x86_64-w64-mingw32-gcc`.
 - **Run:** `make run`
