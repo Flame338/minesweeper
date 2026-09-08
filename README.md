@@ -28,6 +28,13 @@ the library file differs.
   `make PLATFORM=win CC=x86_64-w64-mingw32-gcc`.
 - **Run:** `make run`
 
+`BUILD` selects the build mode. `debug` (the default) compiles with `-g -O0`
+and, on Windows, links a console-subsystem exe so `TraceLog`/`printf` output is
+visible in the terminal — use `make run` to see it. `release` compiles with
+`-O2 -DNDEBUG` and links a GUI-subsystem Windows exe (no console window) for
+distribution: `make BUILD=release` (or the shorthand `make release`). GitHub
+Actions builds release binaries for tags.
+
 The Makefile links the platform libraries raylib's desktop backend needs:
 Windows uses `-lopengl32 -lgdi32 -lwinmm -luser32 -lshell32`; Linux uses
 `-lGL -lm -lpthread -ldl -lrt -lX11`.
