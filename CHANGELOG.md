@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_No unreleased changes yet._
+### Changed
+- Build now supports `BUILD=debug|release`. Debug is the default and keeps a
+  console window on Windows so `TraceLog` output is visible while developing;
+  release compiles optimized (`-O2 -DNDEBUG`) and links a GUI-only Windows exe.
 
 ## [0.1.0] — 2026-09-08
 

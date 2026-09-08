@@ -31,10 +31,30 @@ else
     SRC_EXT := c
 endif
 
+# --- Build mode: debug (console + symbols) or release (optimized, GUI-only) ---
+# Debug is the default so `make run` shows TraceLog/printf output on Windows.
+BUILD ?= debug
+
+ifeq ($(BUILD),debug)
+    DEBUG_FLAGS := -g -O0 -DDEBUG
+    # Windows: force the console subsystem AND the console CRT entry so
+    # TraceLog/printf output is visible while developing. raylib's Win32 lib
+    # exports a WinMain that otherwise pins the exe to the GUI subsystem even
+    # without -mwindows; --entry,mainCRTStartup routes through our own `main`
+    # inside a console window. (Release uses -mwindows for a GUI-only exe.)
+    WINDOW_FLAG := -Wl,--subsystem,console -Wl,--entry,mainCRTStartup
+else ifeq ($(BUILD),release)
+    DEBUG_FLAGS := -O2 -DNDEBUG
+    # Windows: make the shipped exe a GUI-subsystem binary (no console window).
+    WINDOW_FLAG := -mwindows
+else
+    $(error BUILD must be "debug" or "release", got "$(BUILD)")
+endif
+
 # Directories
 SRC_DIR    := src
 INC_DIR    := include
-BUILD_DIR  := build
+BUILD_DIR  := build/$(BUILD)
 BIN_DIR    := bin
 RAYLIB_DIR := raylib
 TEST_DIR   := tests
@@ -58,10 +78,10 @@ ifeq ($(PLATFORM),win)
     # System/import libraries raylib's GLFW/Win32 backend needs (OpenGL, GDI,
     # multimedia, user32, shell32). -static-libgcc keeps libgcc_s_seh-1.dll out
     # of the deployed exe so the binary is self-contained.
-    # -mwindows makes raylib's WinMain shim the entry point, so the shipped
-    # exe is a GUI-subsystem binary (no console window next to the game).
+    # $(WINDOW_FLAG) is -mwindows for release (GUI-subsystem, no console) and
+    # empty for debug (console subsystem, so TraceLog/printf output is visible).
     LDFLAGS := -L$(RAYLIB_DIR)/lib -lraylib -lopengl32 -lgdi32 -lwinmm \
-               -luser32 -lshell32 -lm -static-libgcc -mwindows
+               -luser32 -lshell32 -lm -static-libgcc $(WINDOW_FLAG)
     RAYLIB_URL := $(RAYLIB_BASE_URL)/raylib-$(RAYLIB_TAG)_win64_mingw-w64.zip
 else ifeq ($(PLATFORM),linux)
     EXE_SUFFIX :=
@@ -91,7 +111,7 @@ OBJECTS := $(patsubst $(SRC_DIR)/%.$(SRC_EXT),$(BUILD_DIR)/%.o,$(SOURCES))
 # NOTE: the game sources include the vendored raylib.h, so building the game
 # needs raylib fetched first (`make raylib-get`). The rule files and CORE_SRCS
 # are raylib-free and build without it.
-CFLAGS := -Wall -Wextra -std=c11 -I$(INC_DIR) -I$(RAYLIB_DIR)/include
+CFLAGS := -Wall -Wextra -std=c11 -I$(INC_DIR) -I$(RAYLIB_DIR)/include $(DEBUG_FLAGS)
 
 # Default target
 all: $(TARGET)
@@ -132,6 +152,11 @@ endif
 run: all
 	./$(TARGET)
 
+# Build an optimized release binary (GUI-only on Windows, no debug symbols).
+# Debug is the default for `make`/`make run` to keep logs visible.
+release:
+	$(MAKE) BUILD=release all
+
 # Build the headless debug tool (no raylib) into bin/ms_tool
 tools: $(TOOL_EXE)
 
@@ -160,4 +185,4 @@ clean:
 # Rebuild everything from scratch
 rebuild: clean all
 
-.PHONY: all run tools test clean rebuild raylib-get
+.PHONY: all run release tools test clean rebuild raylib-get

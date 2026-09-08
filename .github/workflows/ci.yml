@@ -54,7 +54,7 @@ jobs:
         run: make raylib-get PLATFORM=${{ matrix.platform }}
 
       - name: Build game
-        run: make PLATFORM=${{ matrix.platform }} CC=${{ matrix.cc }}
+        run: make PLATFORM=${{ matrix.platform }} CC=${{ matrix.cc }} BUILD=release
 
       - name: Package and checksum
         run: |
